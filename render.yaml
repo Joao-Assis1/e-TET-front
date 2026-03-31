@@ -11,4 +11,4 @@ services:
     routes:
       - source: /*
         destination: /index.html
-        action: rewrite
+        type: rewrite
