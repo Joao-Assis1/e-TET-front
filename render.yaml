@@ -1,11 +1,9 @@
 services:
-  - type: static
+  - type: web
     name: e-tet-front
-    env: static
-    # Comandos para entrar na pasta correta antes de buildar
+    runtime: static
     buildCommand: cd e-TET-front && npm install && npm run build
-    # Caminho relativo à raiz do repositório
-    publishDir: e-TET-front/dist
+    staticPublishPath: e-TET-front/dist
     envVars:
       - key: VITE_API_URL
         # Substitua pela URL da sua API no Render (ex: https://e-tet-api.onrender.com)
