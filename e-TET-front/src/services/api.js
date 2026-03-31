@@ -1,11 +1,11 @@
 import axios from 'axios'
+import router from '../router'
 
 const api = axios.create({
-  // URL base da API
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  headers: { 'Content-Type': 'application/json' },
 })
 
-// Interceptor para capturar o token do localStorage e injetar automaticamente
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -14,7 +14,17 @@ api.interceptors.request.use(
     }
     return config
   },
+  (error) => Promise.reject(error),
+)
+
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      router.push({ name: 'login' })
+    }
     return Promise.reject(error)
   },
 )

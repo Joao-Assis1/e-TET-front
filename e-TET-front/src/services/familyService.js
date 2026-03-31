@@ -1,0 +1,34 @@
+import api from './api'
+
+export const familyService = {
+  async getAll() {
+    const response = await api.get('/families')
+    return response.data
+  },
+
+  async getAllByHousehold(householdId) {
+    // API retorna todas as famílias. Filtramos localmente pelo household_id.
+    const response = await api.get('/families')
+    return response.data.filter((f) => f.household?.id === householdId || f.household_id === householdId)
+  },
+
+  async getById(id) {
+    const response = await api.get(`/families/${id}`)
+    return response.data
+  },
+
+  async create(data) {
+    const response = await api.post('/families', data)
+    return response.data
+  },
+
+  async update(id, data) {
+    const response = await api.put(`/families/${id}`, data)
+    return response.data
+  },
+
+  async remove(id) {
+    const response = await api.delete(`/families/${id}`)
+    return response.data
+  },
+}
