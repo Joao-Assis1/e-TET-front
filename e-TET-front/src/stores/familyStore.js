@@ -114,6 +114,26 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  /**
+   * Desvincula a família do domicílio
+   * @param {string} id 
+   * @param {Object} data - { motivo }
+   */
+  const familyMudou = async (id, data = {}) => {
+    loading.value = true
+    error.value = null
+    try {
+      await familyService.mudou(id, data.motivo || '')
+      families.value = families.value.filter((f) => f.id !== id)
+      return true
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Erro ao processar mudança de família.'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     families,
     currentFamily,
@@ -125,5 +145,6 @@ export const useFamilyStore = defineStore('family', () => {
     syncFamily,
     updateFamily,
     removeFamily,
+    familyMudou
   }
 })

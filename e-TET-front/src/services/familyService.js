@@ -31,4 +31,14 @@ export const familyService = {
     const response = await api.delete(`/families/${id}`)
     return response.data
   },
+
+  /**
+   * PATCH /families/:id/mudou — Desvincula família do domicílio (família mudou).
+   * @param {string} id - ID da família
+   * @param {string} motivo - Motivo ou novo endereço (opcional)
+   */
+  async mudou(id, motivo = '') {
+    const response = await api.patch(`/families/${id}/mudou`, { motivo })
+    return response.data
+  },
 }
