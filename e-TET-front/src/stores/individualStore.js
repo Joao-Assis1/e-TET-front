@@ -77,6 +77,25 @@ export const useIndividualStore = defineStore('individual', () => {
     }
   }
 
+  /**
+   * PATCH /individuals/:id/saida — Registra saída (mudou / óbito).
+   * Remove o cidadão da lista local após confirmação.
+   */
+  const saidaCidadao = async (id, data) => {
+    loading.value = true
+    error.value = null
+    try {
+      await individualService.registrarSaida(id, data)
+      individuals.value = individuals.value.filter((i) => i.id !== id)
+      return true
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Erro ao registrar saída do cidadão.'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return { 
     individuals, 
     currentIndividual, 
@@ -85,6 +104,7 @@ export const useIndividualStore = defineStore('individual', () => {
     fetchByFamily, 
     createIndividual, 
     updateIndividual, 
-    removeIndividual 
+    removeIndividual,
+    saidaCidadao
   }
 })

@@ -31,4 +31,14 @@ export const individualService = {
     const response = await api.delete(`/individuals/${id}`)
     return response.data
   },
+
+  /**
+   * PATCH /individuals/:id/saida — Registra saída do cidadão (mudou / óbito).
+   * @param {string} id - ID do indivíduo
+   * @param {Object} data - { motivo_saida: 'mudou' | 'obito' }
+   */
+  async registrarSaida(id, data) {
+    const response = await api.patch(`/individuals/${id}/saida`, data)
+    return response.data
+  },
 }
