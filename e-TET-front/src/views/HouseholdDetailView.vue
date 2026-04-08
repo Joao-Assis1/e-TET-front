@@ -248,8 +248,8 @@
                 <v-divider class="my-0" />
 
                 <!-- Cidadãos Vinculados -->
-                <div v-if="family.individuals && family.individuals.length > 0">
-                  <template v-for="(ind, index) in family.individuals" :key="ind.id">
+                <div v-if="getMergedIndividuals(family).length > 0">
+                  <template v-for="(ind, index) in getMergedIndividuals(family)" :key="ind.id || ind._tempId">
                     <div class="d-flex align-start justify-space-between py-3">
                       <div>
                         <div
@@ -261,25 +261,25 @@
                         </div>
                         <div class="text-caption text-medium-emphasis mb-2">
                           {{
-                            ind.sexo === 'M'
+                            ind.sexo === 'M' || ind.sexo === 'Masculino'
                               ? 'Masculino'
-                              : ind.sexo === 'F'
+                              : ind.sexo === 'F' || ind.sexo === 'Feminino'
                                 ? 'Feminino'
-                                : 'Não informado'
+                                : (ind.sexo || 'Não informado')
                           }}
                           | {{ calculateAgeText(ind.data_nascimento) || 'Idade não informada' }}
                         </div>
                         <div
-                          class="d-flex flex-wrap ga-2"
+                          class="d-flex flex-wrap ga-1 mt-1"
                           v-if="ind.healthConditions && ind.healthConditions.length > 0"
                         >
                           <v-chip
                             size="x-small"
                             v-for="(cond, idx) in ind.healthConditions"
                             :key="idx"
-                            color="orange-darken-4"
-                            variant="tonal"
-                            class="font-weight-medium bg-orange-lighten-5"
+                            color="#475569"
+                            variant="flat"
+                            class="font-weight-bold text-white"
                           >
                             {{ cond }}
                           </v-chip>
@@ -287,9 +287,9 @@
                         <div class="d-flex flex-wrap ga-2" v-else>
                           <v-chip
                             size="x-small"
-                            color="grey-darken-2"
+                            color="#64748b"
                             variant="tonal"
-                            class="font-weight-medium bg-grey-lighten-3"
+                            class="font-weight-bold bg-grey-lighten-4"
                           >
                             Sem condições
                           </v-chip>
@@ -794,15 +794,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useHouseholdStore } from '../stores/householdStore'
 import { useFamilyStore } from '../stores/familyStore'
+import { useIndividualStore } from '../stores/individualStore'
 import { useVisitStore } from '../stores/visitStore'
 import { useVisitCartStore } from '../stores/visitCartStore'
-import { useIndividualStore } from '../stores/individualStore'
 import { sanitizeFamilyPayload } from '../utils/sanitizePayload'
 import { calculateFamilyRisk } from '../utils/coelhoSavassi'
+import { processIndividualFromApi } from '../utils/healthConditionMapper'
 
 const route = useRoute()
 const router = useRouter()
@@ -861,7 +862,68 @@ const familyForm = ref({
 })
 
 const household = computed(() => householdStore.currentHousehold)
-const allFamilies = computed(() => [...familyStore.families])
+
+const allFamilies = computed(() => {
+  const storeFamilies = familyStore.families || []
+  const drafts = (visitCartStore.draftFamilies || []).filter(df => df.household_id === route.params.id)
+  
+  // Merge and avoid duplicates by id or _tempId
+  const merged = [...storeFamilies]
+  drafts.forEach(df => {
+    if (!merged.find(f => (f.id && f.id === df.id) || (f._tempId && f._tempId === df._tempId))) {
+      merged.push(df)
+    }
+  })
+  
+  return merged
+})
+
+/**
+ * Retorna lista de cidadãos mesclada (Persistidos + Rascunhos) para uma família.
+ * Garante que indivíduos cadastrados durante a visita fiquem visíveis.
+ */
+const getMergedIndividuals = (family) => {
+  const familyId = String(family.id || family._tempId || '').toLowerCase()
+  
+  // 1. Persistidos que vieram na estrutura da família (se houver)
+  const persistedInFamily = family.individuals || []
+  
+  // 2. Persistidos que estão no store global (buscados via fetchAll)
+  const persistedInStore = (individualStore.individuals || []).filter(i => {
+    const indFid = String(i.family_id || (i.family && i.family.id) || '').toLowerCase()
+    return indFid === familyId
+  })
+  
+  // 3. Rascunhos locais (cadastrados agora e não sincronizados)
+  const drafts = (visitCartStore.draftIndividuals || []).filter(di => {
+    const draftFid = String(di.family_id || (di.family && di.family.id) || '').toLowerCase()
+    return draftFid === familyId
+  })
+
+  // Mesclar tudo priorizando duplicatas por ID
+  const merged = [...persistedInFamily]
+  
+  // Adicionar do store global
+  persistedInStore.forEach(i => {
+    if (!merged.find(m => m.id === i.id)) {
+      merged.push(i)
+    }
+  })
+  
+  // Adicionar rascunhos
+  drafts.forEach(di => {
+    const isDuplicate = merged.find(i => 
+      (i.id && i.id === di.id) || 
+      (i._tempId && i._tempId === di._tempId)
+    )
+    if (!isDuplicate) {
+      merged.push(processIndividualFromApi({ ...di }))
+    }
+  })
+
+  return merged
+}
+
 const housingDetails = computed(() => {
   if (!household.value) return {}
   return {
@@ -1025,6 +1087,7 @@ const openFamilyDialog = (family = null) => {
 const handleSaveFamily = async () => {
   const { valid } = await familyFormRef.value.validate()
   if (!valid) return
+
   const rawPayload = {
     numero_prontuario: familyForm.value.numero_prontuario,
     renda_familiar: familyForm.value.renda_familiar,
@@ -1033,15 +1096,26 @@ const handleSaveFamily = async () => {
     saneamento_inadequado: false,
     household_id: route.params.id,
   }
-  if (editingFamilyId.value) {
-    const success = await familyStore.updateFamily(
-      editingFamilyId.value,
-      sanitizeFamilyPayload(rawPayload),
-    )
-    if (success) familyDialog.value = false
-  } else {
-    const success = await familyStore.createFamily(sanitizeFamilyPayload(rawPayload))
-    if (success) familyDialog.value = false
+
+  const sanitized = sanitizeFamilyPayload(rawPayload)
+  console.log('[handleSaveFamily] Payload que será enviado:', JSON.stringify(sanitized, null, 2))
+
+  try {
+    let result
+    if (editingFamilyId.value) {
+      result = await familyStore.updateFamily(editingFamilyId.value, sanitized)
+    } else {
+      result = await familyStore.createFamily(sanitized)
+    }
+
+    if (result) {
+      familyDialog.value = false
+    } else {
+      // O store já atualiza a ref 'error', mas podemos disparar um alert aqui se desejar
+      alert(familyStore.error || 'Erro ao salvar família.')
+    }
+  } catch (err) {
+    console.error('[handleSaveFamily] Exceção:', err)
   }
 }
 
@@ -1065,12 +1139,17 @@ const handleDeleteDomicilio = async () => {
 }
 
 onMounted(async () => {
-  await householdStore.fetchById(route.params.id)
-  const hasLoaded = familyStore.families.some(
-    (f) => f.household_id === route.params.id || f.household?.id === route.params.id,
-  )
-  if (!hasLoaded || familyStore.families.length === 0)
-    await familyStore.fetchByHousehold(route.params.id)
+  const id = route.params.id
+  if (id) {
+    console.log('[HouseholdDetailView] Carregando dados para o domicílio:', id)
+    await householdStore.fetchById(id)
+    await familyStore.fetchByHousehold(id)
+    console.log('[HouseholdDetailView] Famílias carregadas:', familyStore.families.length)
+    
+    await individualStore.fetchAll()
+    console.log('[HouseholdDetailView] Total de cidadãos no store:', individualStore.individuals.length)
+  }
+  
   visitCartStore.initVisit(route.params.id)
 })
 </script>

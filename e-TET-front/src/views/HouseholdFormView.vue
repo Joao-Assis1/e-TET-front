@@ -287,6 +287,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useHouseholdStore } from '../stores/householdStore'
+import { sanitizeHouseholdPayload } from '../utils/sanitizePayload'
 
 const router = useRouter()
 const route = useRoute()
@@ -348,27 +349,15 @@ const handleNext = async () => {
     currentStep.value++
     window.scrollTo(0, 0)
   } else {
-    // Preparar payload APENAS com campos aceitos pela API (conforme API_context.md)
-    const fd = formData.value
-    const payload = {
-      cep: fd.cep ? fd.cep.replace(/\D/g, '') : '',
-      logradouro: fd.logradouro,
-      numero: fd.is_sn ? 'S/N' : fd.numero,
-      complemento: fd.complemento || '',
-      bairro: fd.bairro,
-      situacao_moradia: fd.situacao_moradia,
-      localizacao: fd.localizacao,
-      tipo_domicilio: fd.tipo_domicilio,
-      numero_moradores: Number(fd.numero_moradores) || 1,
-      numero_comodos: Number(fd.numero_comodos) || 1,
-      material_construcao: fd.material_construcao,
-      abastecimento_agua: fd.abastecimento_agua,
-      agua_consumo: fd.agua_consumo,
-      escoamento_banheiro: fd.escoamento_banheiro,
-      possui_animais: !fd.sem_animais,
-      quantidade_animais: fd.sem_animais ? 0 : fd.animais_quais.length,
-      animais_quais: fd.sem_animais ? [] : fd.animais_quais,
-    }
+    // Usar o sanitizador centralizado que inclui todos os campos exigidos pela API
+    const payload = sanitizeHouseholdPayload({
+      ...formData.value,
+      // Mapeamentos específicos de UI que o sanitizador trata mas precisam de trigger
+      cep: formData.value.cep,
+      numero: formData.value.is_sn ? 'S/N' : formData.value.numero,
+      possui_animais: !formData.value.sem_animais,
+      quantidade_animais: formData.value.sem_animais ? 0 : formData.value.animais_quais.length
+    })
 
     let result
     if (isEdit.value) {
@@ -387,9 +376,18 @@ onMounted(async () => {
   if (isEdit.value) {
     await householdStore.fetchById(route.params.id)
     if (householdStore.currentHousehold) {
-      Object.assign(formData.value, householdStore.currentHousehold)
-      formData.value.sem_animais = !householdStore.currentHousehold.possui_animais
-      if (formData.value.numero === 'S/N') formData.value.is_sn = true
+      const h = householdStore.currentHousehold
+      Object.assign(formData.value, h)
+      
+      // Ajustes para a lógica da UI
+      formData.value.sem_animais = h.possui_animais === false
+      formData.value.animais_quais = Array.isArray(h.animais_quais) ? h.animais_quais : []
+      if (h.numero === 'S/N') {
+        formData.value.is_sn = true
+        formData.value.numero = ''
+      } else {
+        formData.value.is_sn = false
+      }
     }
   }
 })
