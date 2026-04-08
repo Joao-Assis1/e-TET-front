@@ -309,11 +309,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useVisitCartStore } from '../stores/visitCartStore'
+import { useFamilyStore } from '../stores/familyStore'
+import { useIndividualStore } from '../stores/individualStore'
 import api from '../services/api'
 
 const router = useRouter()
 const route = useRoute()
 const visitCartStore = useVisitCartStore()
+const familyStore = useFamilyStore()
+const individualStore = useIndividualStore()
 
 const currentStep = ref(1)
 const confirmExit = ref(false)
@@ -509,30 +513,36 @@ function populateFormFromPayload(data) {
   formData.nome_pai = data.nome_pai
   formData.nome_pai_desconhecido = data.nome_pai_desconhecido
   
-  // Condições
-  formData.possui_deficiencia = data.possui_deficiencia
-  formData.deficiencias = data.deficiencias || []
-  formData.peso_inadequado = data.situacao_peso !== 'Adequado'
-  formData.peso_tipo = data.situacao_peso || 'Acima'
-  formData.gestante = data.gestante
-  formData.maternidade_referencia = data.maternidade_referencia
-  formData.fumante = data.fumante
-  formData.dependente_alcool = data.uso_alcool
-  formData.dependente_drogas = data.uso_outras_drogas
-  formData.possui_hipertensao_arterial = data.hipertensao_arterial
-  formData.possui_diabetes = data.diabetes
-  formData.teve_avc_derrame = data.teve_avc_derrame
-  formData.teve_infarto = data.teve_infarto
-  formData.possui_doenca_cardiaca = data.doenca_cardiaca
-  formData.possui_problemas_rins = data.problemas_rins
-  formData.possui_doenca_respiratoria = data.doenca_respiratoria
-  formData.tuberculose = data.tuberculose
-  formData.possui_hanseniase = data.hanseniase
-  formData.possui_cancer = data.teve_cancer
-  formData.doenca_mental_psiquiatrica = data.doenca_mental_psiquiatrica
-  formData.acamado = data.acamado
-  formData.esta_domiciliado = data.domiciliado
-  formData.usa_plantas_medicinais = data.usa_plantas_medicinais
+  // Extrair condições de saúde (podem estar no topo ou aninhadas em healthConditions)
+  const hc = data.healthConditions || {}
+
+  formData.possui_deficiencia = data.possui_deficiencia ?? hc.possui_deficiencia
+  formData.deficiencias = data.deficiencias || hc.deficiencias || []
+  
+  const situacaoPeso = data.situacao_peso || hc.situacao_peso || 'Adequado'
+  formData.peso_inadequado = situacaoPeso !== 'Adequado'
+  formData.peso_tipo = situacaoPeso
+  
+  formData.gestante = data.gestante ?? hc.gestante
+  formData.maternidade_referencia = data.maternidade_referencia ?? hc.maternidade_referencia
+  
+  formData.fumante = data.fumante ?? hc.fumante
+  formData.dependente_alcool = data.uso_alcool ?? hc.uso_alcool
+  formData.dependente_drogas = data.uso_outras_drogas ?? hc.uso_outras_drogas
+  formData.possui_hipertensao_arterial = data.hipertensao_arterial ?? hc.hipertensao_arterial
+  formData.possui_diabetes = data.diabetes ?? hc.diabetes
+  formData.teve_avc_derrame = data.teve_avc_derrame ?? hc.teve_avc_derrame
+  formData.teve_infarto = data.teve_infarto ?? hc.teve_infarto
+  formData.possui_doenca_cardiaca = data.doenca_cardiaca ?? hc.doenca_cardiaca
+  formData.possui_problemas_rins = data.problemas_rins ?? hc.problemas_rins
+  formData.possui_doenca_respiratoria = data.doenca_respiratoria ?? hc.doenca_respiratoria
+  formData.tuberculose = data.tuberculose ?? hc.tuberculose
+  formData.possui_hanseniase = data.hanseniase ?? hc.hanseniase
+  formData.possui_cancer = data.teve_cancer ?? hc.teve_cancer
+  formData.doenca_mental_psiquiatrica = data.doenca_mental_psiquiatrica ?? hc.doenca_mental_psiquiatrica
+  formData.acamado = data.acamado ?? hc.acamado
+  formData.esta_domiciliado = data.domiciliado ?? hc.domiciliado
+  formData.usa_plantas_medicinais = data.usa_plantas_medicinais ?? hc.usa_plantas_medicinais
 }
 
 /**
@@ -624,12 +634,43 @@ const handleNext = async () => {
     currentStep.value++
     window.scrollTo(0, 0)
   } else {
-    const payload = buildIndividualPayload()
-    if (!payload) return
+    const rawPayload = buildIndividualPayload()
+    if (!rawPayload) return
 
-    // Salva no "carrinho" localmente (Atomic Draft Pattern)
-    visitCartStore.updateOrAddDraftIndividual(payload)
-    handleExit()
+    try {
+      loading.value = true
+      let result;
+      if (formData.id) {
+        result = await individualStore.updateIndividual(formData.id, rawPayload)
+      } else {
+        result = await individualStore.createIndividual(rawPayload)
+      }
+      
+      if (result) {
+        // Atualiza a família local otimisticamente
+        const familyStore = useFamilyStore()
+        familyStore.addIndividualLocal(rawPayload.family_id || result.family_id, result)
+        
+        // NOVIDADE: Persistent state - Adicionar ao carrinho de rascunhos da visita
+        // Isso garante que o cidadão continue visível mesmo que o fetch do onMounted
+        // do HouseholdDetailView demore ou falhe em retornar o novo registro.
+        visitCartStore.updateOrAddDraftIndividual({
+          ...result,
+          family_id: rawPayload.family_id || result.family_id
+        })
+
+        handleExit()
+      } else {
+        errorMessage.value = individualStore.error || 'Erro ao salvar o cidadão.'
+        showError.value = true
+      }
+    } catch (err) {
+      console.error('Erro no handleNextIndividual:', err)
+      errorMessage.value = 'Houve um erro ao salvar o cidadão.'
+      showError.value = true
+    } finally {
+      loading.value = false
+    }
   }
 }
 
