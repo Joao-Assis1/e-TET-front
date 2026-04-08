@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { familyService } from '../services/familyService'
 import { syncService } from '../services/syncService'
 import { sanitizeFamilyPayload, sanitizeIndividualPayload } from '../utils/sanitizePayload'
+import { processFamiliesFromApi } from '../utils/healthConditionMapper'
 
 export const useFamilyStore = defineStore('family', () => {
   const families = ref([])
@@ -15,7 +16,8 @@ export const useFamilyStore = defineStore('family', () => {
     loading.value = true
     error.value = null
     try {
-      families.value = await familyService.getAllByHousehold(householdId)
+      const rawFamilies = await familyService.getAllByHousehold(householdId)
+      families.value = processFamiliesFromApi(rawFamilies)
     } catch (err) {
       error.value = err.response?.data?.message || 'Erro ao carregar famílias.'
     } finally {

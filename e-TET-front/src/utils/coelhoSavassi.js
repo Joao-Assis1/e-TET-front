@@ -4,51 +4,37 @@
  */
 
 export function calculateFamilyRisk(family, household) {
-  let score = 0
+  let r = 0
 
-  // 1. Variáveis do Domicílio
-  if (household) {
-    if (household.abastecimento_agua !== 'Rede encanada até o domicílio') score += 1
-    if (
-      household.situacao_moradia === 'Situação de rua' ||
-      household.situacao_moradia === 'Invasão'
-    )
-      score += 1
-  }
-
-  // 2. Variáveis da Família
+  // Saneamento Inadequado (Family) = 3 pontos
   if (family && family.saneamento_inadequado) {
-    score += 1
+    r += 3
   }
 
-  if (family && family.renda_familiar !== null && family.renda_familiar !== undefined) {
-    if (family.renda_familiar < 330) {
-      score += 1 // Analfabetismo / Desemprego ou renda extrema
-    }
-  }
-
-  // 3. Fatores Individuais (Cidadãos)
+  // Fatores Individuais (Cidadãos)
   if (family && Array.isArray(family.individuals)) {
     for (const ind of family.individuals) {
-      // Condições clínicas
-      if (ind.healthConditions && Array.isArray(ind.healthConditions)) {
-        ind.healthConditions.forEach((cond) => {
-          const c = cond.toLowerCase()
-          if (c.includes('acamado')) score += 3
-          if (c.includes('deficiência') || c.includes('deficiente')) score += 3
-          if (c.includes('desnutrição')) score += 3
-          if (c.includes('drogadição') || c.includes('drogas') || c.includes('álcool')) score += 2
-          if (c.includes('tuberculose') || c.includes('hanseníase')) score += 2
+      // No Frontend, o data object bruto enviado está em ind._healthObject se foi mapeado,
+      // ou devemos olhar as strings em ind.healthConditions
+      const _hc = ind._healthObject || {}
+      
+      if (_hc.acamado_domiciliado) r += 3
+      if (ind.possui_deficiencia) r += 3
 
-          if (c.includes('hipertensão')) score += 1
-          if (c.includes('diabetes')) score += 1
-        })
-      }
-
+      if (_hc.uso_alcool || _hc.uso_outras_drogas || _hc.fumante) r += 2
+      
+      // Desemprego
+      if (ind.situacao_mercado_trabalho === 'Desempregado' || ind.situacao_mercado_trabalho === 'Asalariado sem carteira assinada') {
+        // Adaptando pro backend, conta 2
+        r += 2
+      } else if (ind.situacao_mercado_trabalho === 'Desempregado') {
+        // Garantindo consistencia estrita se for apenas Desempregado
+        r += 2
+      } // Pra ficar 100% igual ao backend:
+      
       // Condições etárias
       if (ind.data_nascimento) {
         const birthStr = String(ind.data_nascimento)
-        // Tenta converter tanto de DD/MM/YYYY quanto de YYYY-MM-DD
         let birth
         if (birthStr.includes('/')) {
           const parts = birthStr.split('/')
@@ -58,49 +44,51 @@ export function calculateFamilyRisk(family, household) {
         }
 
         if (birth && !isNaN(birth.getTime())) {
-          const ageInDays = (new Date() - birth) / (1000 * 60 * 60 * 24)
-          if (ageInDays > 0) {
-            if (ageInDays < 180) score += 2 // Menor de 6 meses
-            if (ageInDays > 365 * 70) score += 2 // Maior de 70 anos
-          }
+          const ageMonths = (new Date() - birth) / (1000 * 60 * 60 * 24 * 30.44)
+          const ageYears = Math.abs(new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970)
+          
+          if (ageMonths < 6) r += 1
+          if (ageYears > 70) r += 1
         }
       }
+      
+      if (_hc.hipertensao_arterial) r += 1
+      if (_hc.diabetes) r += 1
     }
   }
 
-  // Determinar Faixa de Risco
-  if (score === 0) {
-    return {
-      label: 'R0',
-      color: 'blue-grey',
-      icon: 'mdi-shield-check',
-      score,
-      description: 'Sem risco aparente',
-    }
-  } else if (score <= 4) {
-    // Algumas referências dizem <=4 ou <=3 para o R1, ajustado pro padrão
-    return {
-      label: 'R1',
-      color: 'blue',
-      icon: 'mdi-alert-circle-outline',
-      score,
-      description: 'Risco Menor',
-    }
-  } else if (score <= 6) {
-    return {
-      label: 'R2',
-      color: 'orange-darken-2',
-      icon: 'mdi-alert',
-      score,
-      description: 'Risco Médio',
-    }
-  } else {
+  // Determinar Faixa de Risco igual ao Backend
+  if (r >= 9) {
     return {
       label: 'R3',
       color: 'red-darken-2',
       icon: 'mdi-alert-octagon',
-      score,
+      score: r,
       description: 'Risco Máximo',
+    }
+  } else if (r >= 7) {
+    return {
+      label: 'R2',
+      color: 'orange-darken-2',
+      icon: 'mdi-alert',
+      score: r,
+      description: 'Risco Médio',
+    }
+  } else if (r >= 5) {
+    return {
+      label: 'R1',
+      color: 'blue',
+      icon: 'mdi-alert-circle-outline',
+      score: r,
+      description: 'Risco Menor',
+    }
+  } else {
+    return {
+      label: 'R0',
+      color: 'blue-grey',
+      icon: 'mdi-shield-check',
+      score: r,
+      description: 'Sem Risco',
     }
   }
 }

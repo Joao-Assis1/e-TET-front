@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { individualService } from '../services/individualService'
 import { sanitizeIndividualPayload } from '../utils/sanitizePayload'
+import { processIndividualFromApi } from '../utils/healthConditionMapper'
 
 export const useIndividualStore = defineStore('individual', () => {
   const individuals = ref([])
@@ -9,11 +10,25 @@ export const useIndividualStore = defineStore('individual', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const fetchAll = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const rawIndividuals = await individualService.getAll()
+      individuals.value = rawIndividuals.map(processIndividualFromApi)
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Erro ao carregar indivíduos.'
+    } finally {
+      loading.value = false
+    }
+  }
+
   const fetchByFamily = async (familyId) => {
     loading.value = true
     error.value = null
     try {
-      individuals.value = await individualService.getAllByFamily(familyId)
+      const rawIndividuals = await individualService.getAllByFamily(familyId)
+      individuals.value = rawIndividuals.map(processIndividualFromApi)
     } catch (err) {
       error.value = err.response?.data?.message || 'Erro ao carregar indivíduos.'
     } finally {
@@ -30,7 +45,10 @@ export const useIndividualStore = defineStore('individual', () => {
     error.value = null
     try {
       const sanitized = sanitizeIndividualPayload(rawData, { forSync: false })
-      console.log('[createIndividual] Payload sanitizado:', JSON.stringify(sanitized, null, 2))
+      console.log('--- DEBUG: INÍCIO DA CRIAÇÃO (Individual Store) ---')
+      console.log('Original:', rawData)
+      console.log('Sanitizado:', sanitized)
+      console.log('--- DEBUG: FIM DA CRIAÇÃO ---')
       const created = await individualService.create(sanitized)
       individuals.value.push(created)
       return created
@@ -101,6 +119,7 @@ export const useIndividualStore = defineStore('individual', () => {
     currentIndividual, 
     loading, 
     error, 
+    fetchAll,
     fetchByFamily, 
     createIndividual, 
     updateIndividual, 
