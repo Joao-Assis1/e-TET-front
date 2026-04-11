@@ -21,14 +21,58 @@
       </div>
       <v-divider />
       <v-list nav class="pa-2">
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Território</v-list-subheader>
         <v-list-item
-          prepend-icon="mdi-home-group"
+          prepend-icon="mdi-home"
           title="Domicílios"
           to="/households"
           rounded="lg"
           color="primary"
         />
+        <v-list-item
+          prepend-icon="mdi-account-group"
+          title="Famílias"
+          to="/families"
+          rounded="lg"
+          color="primary"
+        />
+        <v-list-item
+          prepend-icon="mdi-account-multiple"
+          title="Pessoas"
+          to="/people"
+          rounded="lg"
+          color="primary"
+        />
+
+        <v-divider class="my-2" />
+        
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Sincronização</v-list-subheader>
+        <v-list-item
+          :prepend-icon="syncStore.statusIcon"
+          :title="syncStore.syncing ? 'Sincronizando...' : 'Sincronizar'"
+          :subtitle="syncStore.pendingCount > 0 ? `${syncStore.pendingCount} pendentes` : 'Tudo em dia'"
+          @click="syncStore.performFullSync"
+          :disabled="syncStore.syncing"
+          :color="syncStore.statusColor"
+          rounded="lg"
+        >
+          <template v-slot:append v-if="syncStore.syncing">
+            <v-progress-circular indeterminate size="20" width="2" />
+          </template>
+        </v-list-item>
+
+        <v-divider class="my-2" />
+
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Histórico</v-list-subheader>
+        <v-list-item
+          prepend-icon="mdi-history"
+          title="Visitas"
+          to="/visits"
+          rounded="lg"
+          color="primary"
+        />
       </v-list>
+
       <template v-slot:append>
         <div class="pa-4">
           <v-btn block variant="outlined" color="error" @click="handleLogout" class="text-none">
@@ -42,17 +86,43 @@
     <v-main>
       <router-view />
     </v-main>
+
+    <!-- Feedback Global de Sincronização -->
+    <v-snackbar
+      v-model="showSnackbar"
+      :color="syncStore.error ? 'error' : 'success'"
+      :timeout="5000"
+      location="top right"
+    >
+      {{ snackbarMessage }}
+      <template v-slot:actions>
+        <v-btn variant="text" @click="showSnackbar = false">Fechar</v-btn>
+      </template>
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
+import { useSyncStore } from '../stores/syncStore'
 
 const authStore = useAuthStore()
+const syncStore = useSyncStore()
 const router = useRouter()
 const drawer = ref(false)
+
+const showSnackbar = ref(false)
+const snackbarMessage = computed(() => syncStore.error || syncStore.successMessage)
+
+watch(() => syncStore.successMessage, (val) => {
+  if (val) showSnackbar.value = true
+})
+
+watch(() => syncStore.error, (val) => {
+  if (val) showSnackbar.value = true
+})
 
 const roleLabels = { admin: 'Administrador', gestor: 'Gestor', profissional: 'Profissional' }
 const roleLabel = computed(() => roleLabels[authStore.user?.role] || 'Profissional')

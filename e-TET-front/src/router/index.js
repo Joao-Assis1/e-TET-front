@@ -23,6 +23,21 @@ const router = createRouter({
           name: 'households',
           component: () => import('../views/HouseholdListView.vue'),
         },
+        {
+          path: 'families',
+          name: 'families',
+          component: () => import('../views/FamilyListView.vue'),
+        },
+        {
+          path: 'people',
+          name: 'people',
+          component: () => import('../views/PersonListView.vue'),
+        },
+        {
+          path: 'visits',
+          name: 'visits',
+          component: () => import('../views/VisitHistoryView.vue'),
+        },
       ],
     },
     {
@@ -43,6 +58,13 @@ const router = createRouter({
       path: '/households/new',
       name: 'household-create',
       component: () => import('../views/HouseholdFormView.vue'),
+      meta: { requiresAuth: true, transition: 'slide-left' },
+    },
+    {
+      path: '/families/:familyId/risk',
+      name: 'family-risk',
+      component: () => import('../views/FamilyRiskView.vue'),
+      props: true,
       meta: { requiresAuth: true, transition: 'slide-left' },
     },
     {
