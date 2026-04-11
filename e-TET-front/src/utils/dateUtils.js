@@ -50,6 +50,14 @@ export const formatToBRDate = (date) => {
   return d.toLocaleDateString('pt-BR');
 };
 
+export const formatDate = (date) => {
+  if (!date) return 'Data desconhecida';
+  const d = typeof date === 'string' ? parseDateSafe(date) : date;
+  if (!d || isNaN(d.getTime())) return 'Data inválida';
+  
+  return d.toLocaleDateString('pt-BR');
+};
+
 export const formatToMonthYear = (dateStr) => {
   if (!dateStr) return '';
   // Se já estiver no formato MM/YYYY, retorna como está

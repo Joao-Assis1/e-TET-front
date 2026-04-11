@@ -843,7 +843,7 @@ import { useVisitCartStore } from '../stores/visitCartStore'
 import { sanitizeFamilyPayload } from '../utils/sanitizePayload'
 import { processIndividualFromApi } from '../utils/healthConditionMapper'
 import { normalizeId, areIdsEqual } from '../utils/idNormalization'
-import { calculateAgeText, formatToMonthYear } from '../utils/dateUtils'
+import { calculateAgeText, formatToMonthYear, formatDate } from '../utils/dateUtils'
 
 const route = useRoute()
 const router = useRouter()
@@ -1031,10 +1031,7 @@ const getFamilyRisk = (family) => {
     description: 'Não Estratificado' 
   }
 }
-const formatDate = (d) => {
-  if (!d) return 'Data desconhecida'
-  return new Date(d).toLocaleDateString('pt-BR')
-}
+// Utilizando formatDate importado do dateUtils
 
 // Removed local calculateAgeText as it is now imported
 
