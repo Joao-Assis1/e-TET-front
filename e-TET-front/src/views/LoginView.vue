@@ -9,7 +9,7 @@
               <div class="login-header__icon">
                 <v-icon size="52" color="white">mdi-home-city</v-icon>
               </div>
-              <h1 class="login-header__title">e-TET</h1>
+              <h1 class="login-header__title">e-ACS</h1>
               <p class="login-header__subtitle">Território Eletrônico</p>
             </div>
 

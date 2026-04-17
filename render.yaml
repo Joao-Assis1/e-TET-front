@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: e-tet-front
+    name: e-ACS-front
     runtime: static
-    buildCommand: cd e-TET-front && npm install && npm run build
-    staticPublishPath: e-TET-front/dist
+    buildCommand: cd e-ACS-front && npm install && npm run build
+    staticPublishPath: e-ACS-front/dist
     envVars:
       - key: VITE_API_URL
         # Substitua pela URL da sua API no Render (ex: https://e-tet-api.onrender.com)

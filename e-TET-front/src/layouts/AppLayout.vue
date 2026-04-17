@@ -2,7 +2,7 @@
   <div>
     <v-app-bar color="primary" density="comfortable" elevation="2">
       <v-app-bar-nav-icon @click="drawer = !drawer" />
-      <v-app-bar-title class="font-weight-bold">e-TET</v-app-bar-title>
+      <v-app-bar-title class="font-weight-bold">e-ACS</v-app-bar-title>
       <v-spacer />
       <v-chip variant="tonal" color="white" size="small" class="mr-2">
         <v-icon start size="16">mdi-account</v-icon>
@@ -14,14 +14,16 @@
     </v-app-bar>
 
     <v-navigation-drawer v-model="drawer" temporary>
-      <div class="drawer-header pa-5" style="background: linear-gradient(135deg, #05684B, #0C9C6E);">
+      <div class="drawer-header pa-5" style="background: linear-gradient(135deg, #05684b, #0c9c6e)">
         <v-icon size="40" color="white" class="mb-2">mdi-account-circle</v-icon>
         <div class="text-subtitle-1 font-weight-bold text-white">{{ authStore.user?.usuario }}</div>
-        <div class="text-caption" style="color: rgba(255,255,255,0.8);">Agente de Saúde</div>
+        <div class="text-caption" style="color: rgba(255, 255, 255, 0.8)">Agente de Saúde</div>
       </div>
       <v-divider />
       <v-list nav class="pa-2">
-        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Território</v-list-subheader>
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption"
+          >Território</v-list-subheader
+        >
         <v-list-item
           prepend-icon="mdi-home"
           title="Domicílios"
@@ -45,12 +47,16 @@
         />
 
         <v-divider class="my-2" />
-        
-        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Sincronização</v-list-subheader>
+
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption"
+          >Sincronização</v-list-subheader
+        >
         <v-list-item
           :prepend-icon="syncStore.statusIcon"
           :title="syncStore.syncing ? 'Sincronizando...' : 'Sincronizar'"
-          :subtitle="syncStore.pendingCount > 0 ? `${syncStore.pendingCount} pendentes` : 'Tudo em dia'"
+          :subtitle="
+            syncStore.pendingCount > 0 ? `${syncStore.pendingCount} pendentes` : 'Tudo em dia'
+          "
           @click="syncStore.performFullSync"
           :disabled="syncStore.syncing"
           :color="syncStore.statusColor"
@@ -63,7 +69,9 @@
 
         <v-divider class="my-2" />
 
-        <v-list-subheader class="text-uppercase font-weight-bold text-caption">Histórico</v-list-subheader>
+        <v-list-subheader class="text-uppercase font-weight-bold text-caption"
+          >Histórico</v-list-subheader
+        >
         <v-list-item
           prepend-icon="mdi-history"
           title="Visitas"
@@ -116,14 +124,19 @@ const drawer = ref(false)
 const showSnackbar = ref(false)
 const snackbarMessage = computed(() => syncStore.error || syncStore.successMessage)
 
-watch(() => syncStore.successMessage, (val) => {
-  if (val) showSnackbar.value = true
-})
+watch(
+  () => syncStore.successMessage,
+  (val) => {
+    if (val) showSnackbar.value = true
+  },
+)
 
-watch(() => syncStore.error, (val) => {
-  if (val) showSnackbar.value = true
-})
-
+watch(
+  () => syncStore.error,
+  (val) => {
+    if (val) showSnackbar.value = true
+  },
+)
 
 const handleLogout = () => {
   authStore.logout()
