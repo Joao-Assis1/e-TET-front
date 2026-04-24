@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { familyService } from '../services/familyService'
-import { syncService } from '../services/syncService'
-import { sanitizeFamilyPayload, sanitizeIndividualPayload, sanitizeRiskPayload } from '../utils/sanitizePayload'
+import { db } from '../services/localDb'
 import { processFamiliesFromApi } from '../utils/healthConditionMapper'
-import { persistence } from '../utils/persistence'
+import { sanitizeRiskPayload } from '../utils/sanitizePayload'
 import { generateId } from '../utils/uuid'
 import { areIdsEqual } from '../utils/idNormalization'
 
@@ -16,15 +15,32 @@ export const useFamilyStore = defineStore('family', () => {
   const lastSyncResult = ref(null)
   const riskHistory = ref([])
 
-  const loadFromLocal = () => {
-    const saved = persistence.load('family')
-    if (saved) {
-      families.value = saved.families || []
+  /**
+   * Carrega do IndexedDB no início.
+   */
+  const loadFromLocal = async () => {
+    try {
+      const saved = await db.families.toArray()
+      families.value = saved || []
+      return families.value
+    } catch (err) {
+      console.error('Erro ao carregar famílias do IndexedDB:', err)
+      return []
     }
   }
 
-  const saveToLocal = () => {
-    persistence.save('family', { families: families.value })
+  /**
+   * Sincroniza o estado em memória com o banco local.
+   */
+  const saveToLocal = async () => {
+    try {
+      await db.families.clear()
+      if (families.value.length > 0) {
+        await db.families.bulkAdd(JSON.parse(JSON.stringify(families.value)))
+      }
+    } catch (err) {
+      console.error('Erro ao salvar famílias no IndexedDB:', err)
+    }
   }
 
   const fetchByHousehold = async (householdId) => {
@@ -47,10 +63,10 @@ export const useFamilyStore = defineStore('family', () => {
         ...filteredOld,
         ...apiFamilies.map(f => ({ ...f, syncStatus: 'SYNCED' }))
       ]
-      saveToLocal()
+      await saveToLocal()
     } catch (err) {
       console.warn('Falha ao buscar famílias da API.', err)
-      loadFromLocal()
+      await loadFromLocal()
     } finally {
       loading.value = false
     }
@@ -65,11 +81,11 @@ export const useFamilyStore = defineStore('family', () => {
       const beforeCount = families.value.length
       families.value = families.value.filter(f => {
         if (f.syncStatus !== 'SYNCED') return true
-        return apiIds.has(f.id)
+        return apiIds.has(h.id)
       })
       
       if (families.value.length < beforeCount) {
-        saveToLocal()
+        await saveToLocal()
       }
     } catch (err) {
       console.error('Falha ao executar poda de famílias órfãs', err)
@@ -85,6 +101,12 @@ export const useFamilyStore = defineStore('family', () => {
       return local
     }
 
+    const dbItem = await db.families.get(id)
+    if (dbItem) {
+      currentFamily.value = dbItem
+      return dbItem
+    }
+
     loading.value = true
     error.value = null
     try {
@@ -97,7 +119,7 @@ export const useFamilyStore = defineStore('family', () => {
       if (idx !== -1) families.value[idx] = syncedFamily
       else families.value.push(syncedFamily)
       
-      saveToLocal()
+      await db.families.put(JSON.parse(JSON.stringify(syncedFamily)))
       return currentFamily.value
     } catch (err) {
       error.value = 'Erro ao carregar detalhes da família.'
@@ -117,7 +139,7 @@ export const useFamilyStore = defineStore('family', () => {
       updatedAt: now
     }
     families.value.push(newFamily)
-    saveToLocal()
+    await db.families.add(JSON.parse(JSON.stringify(newFamily)))
     return newFamily
   }
 
@@ -126,14 +148,17 @@ export const useFamilyStore = defineStore('family', () => {
     if (idx !== -1) {
       const current = families.value[idx]
       const newStatus = current.syncStatus === 'SYNCED' ? 'PENDING' : current.syncStatus
-      families.value[idx] = { 
+      
+      const updated = { 
         ...current, 
         ...data, 
         syncStatus: newStatus,
         updatedAt: new Date().toISOString()
       }
-      saveToLocal()
-      return families.value[idx]
+      
+      families.value[idx] = updated
+      await db.families.put(JSON.parse(JSON.stringify(updated)))
+      return updated
     }
     return null
   }
@@ -151,7 +176,7 @@ export const useFamilyStore = defineStore('family', () => {
       if (currentFamily.value && areIdsEqual(currentFamily.value.id, id)) {
         currentFamily.value = null
       }
-      saveToLocal()
+      await db.families.delete(id)
       return true
     } catch (err) {
       error.value = 'Erro ao remover família do servidor.'
@@ -171,7 +196,7 @@ export const useFamilyStore = defineStore('family', () => {
       }
       
       families.value = families.value.filter((f) => !areIdsEqual(f.id, id))
-      saveToLocal()
+      await db.families.delete(id)
       return true
     } catch (err) {
       error.value = 'Erro ao registrar mudança da família.'
@@ -186,24 +211,46 @@ export const useFamilyStore = defineStore('family', () => {
     error.value = null
     try {
       const sanitized = sanitizeRiskPayload(riskData)
-      const result = await familyService.registerRisk(familyId, sanitized)
       
       const idx = families.value.findIndex((f) => areIdsEqual(f.id, familyId))
-      if (idx !== -1) {
-        families.value[idx] = { 
-          ...families.value[idx], 
-          pontuacao_risco: result.finalScore,
-          classificacao_risco: result.riskClass,
-          syncStatus: 'SYNCED' 
+      if (idx === -1) throw new Error('Família não encontrada localmente.')
+      
+      const family = families.value[idx]
+
+      if (family.syncStatus === 'SYNCED') {
+        try {
+          const result = await familyService.registerRisk(familyId, sanitized)
+          const updated = { 
+            ...families.value[idx], 
+            sentinels: sanitized,
+            pontuacao_risco: result.finalScore,
+            classificacao_risco: result.riskClass,
+            syncStatus: 'SYNCED' 
+          }
+          families.value[idx] = updated
+          await db.families.put(JSON.parse(JSON.stringify(updated)))
+          return result
+        } catch (apiErr) {
+          console.warn('[FamilyStore] Falha ao registrar risco no servidor, salvando localmente.', apiErr)
         }
-        if (currentFamily.value && areIdsEqual(currentFamily.value.id, familyId)) {
-          currentFamily.value = { ...families.value[idx] }
-        }
-        saveToLocal()
       }
-      return result
+
+      const updatedLocal = { 
+        ...families.value[idx], 
+        sentinels: sanitized,
+        syncStatus: 'PENDING',
+        updatedAt: new Date().toISOString()
+      }
+      
+      families.value[idx] = updatedLocal
+      await db.families.put(JSON.parse(JSON.stringify(updatedLocal)))
+
+      return {
+        finalScore: 0, 
+        riskClass: 'Pendente de Sincronização' 
+      }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Erro ao salvar estratificação de risco.'
+      error.value = err.response?.data?.message || err.message || 'Erro ao salvar estratificação de risco.'
       return null
     } finally {
       loading.value = false
@@ -221,8 +268,6 @@ export const useFamilyStore = defineStore('family', () => {
       loading.value = false
     }
   }
-
-  loadFromLocal()
 
   return {
     families,

@@ -9,6 +9,19 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
+import { useAuthStore } from './stores/authStore'
+import { useSyncStore } from './stores/syncStore'
+
+const authStore = useAuthStore()
+const syncStore = useSyncStore()
+
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    console.log('[App] Usuário autenticado. Iniciando sincronização total com Neon...')
+    await syncStore.performFullSync()
+  }
+})
 </script>
 
 <style>

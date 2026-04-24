@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { individualService } from '../services/individualService'
-import { sanitizeIndividualPayload } from '../utils/sanitizePayload'
+import { db } from '../services/localDb'
 import { processIndividualFromApi } from '../utils/healthConditionMapper'
-import { normalizeId, areIdsEqual } from '../utils/idNormalization'
-import { persistence } from '../utils/persistence'
 import { generateId } from '../utils/uuid'
+import { areIdsEqual } from '../utils/idNormalization'
 
 export const useIndividualStore = defineStore('individual', () => {
   const individuals = ref([])
@@ -13,32 +12,31 @@ export const useIndividualStore = defineStore('individual', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  const loadFromLocal = () => {
-    const saved = persistence.load('individual')
-    if (saved) {
-      individuals.value = saved.individuals || []
+  /**
+   * Carrega do IndexedDB no início.
+   */
+  const loadFromLocal = async () => {
+    try {
+      const saved = await db.individuals.toArray()
+      individuals.value = saved || []
+      return individuals.value
+    } catch (err) {
+      console.error('Erro ao carregar indivíduos do IndexedDB:', err)
+      return []
     }
   }
 
-  const saveToLocal = () => {
-    persistence.save('individual', { individuals: individuals.value })
-  }
-
-  const fetchAll = async () => {
-    loading.value = true
-    error.value = null
+  /**
+   * Sincroniza o estado em memória com o banco local.
+   */
+  const saveToLocal = async () => {
     try {
-      const rawIndividuals = await individualService.getAll()
-      const apiIndividuals = rawIndividuals.map(processIndividualFromApi)
-      
-      const unsynced = individuals.value.filter(i => i.syncStatus !== 'SYNCED')
-      individuals.value = [...apiIndividuals.map(i => ({ ...i, syncStatus: 'SYNCED' })), ...unsynced]
-      saveToLocal()
+      await db.individuals.clear()
+      if (individuals.value.length > 0) {
+        await db.individuals.bulkAdd(JSON.parse(JSON.stringify(individuals.value)))
+      }
     } catch (err) {
-      console.warn('Falha ao buscar indivíduos da API, usando dados locais.', err)
-      loadFromLocal()
-    } finally {
-      loading.value = false
+      console.error('Erro ao salvar indivíduos no IndexedDB:', err)
     }
   }
 
@@ -47,176 +45,118 @@ export const useIndividualStore = defineStore('individual', () => {
     error.value = null
     try {
       const rawIndividuals = await individualService.getAllByFamily(familyId)
-      const apiIndividuals = rawIndividuals.map(processIndividualFromApi)
-      
-      const unsyncedRelated = individuals.value.filter(i => 
-        i.syncStatus !== 'SYNCED' && 
-        areIdsEqual(i.family_id || i.family?.id || i.familyId, familyId)
-      )
-      const apiSet = new Set(apiIndividuals.map(i => normalizeId(i.id)))
-      const cleanUnsynced = unsyncedRelated.filter(i => !apiSet.has(normalizeId(i.id)))
-      
-      individuals.value = [
-        ...individuals.value.filter(i => 
-          !apiSet.has(normalizeId(i.id)) && 
-          !areIdsEqual(i.family_id || i.family?.id || i.familyId, familyId)
-        ),
-        ...apiIndividuals.map(i => ({ ...i, syncStatus: 'SYNCED' })),
-        ...cleanUnsynced
-      ]
-      saveToLocal()
-    } catch (err) {
-      console.warn('Falha ao buscar indivíduos por família da API.', err)
-      loadFromLocal()
-    } finally {
-      loading.value = false
-    }
-  }
+      const apiIndividuals = rawIndividuals.map(i => processIndividualFromApi(i))
 
-  const createIndividual = async (rawData) => {
-    const sanitized = sanitizeIndividualPayload(rawData, { forSync: false })
-    const now = new Date().toISOString()
-    const newIndividual = {
-      ...sanitized,
-      id: generateId(),
-      syncStatus: 'PENDING',
-      createdAt: now,
-      updatedAt: now
-    }
-    const processed = processIndividualFromApi(newIndividual)
-    individuals.value.push(processed)
-    saveToLocal()
-    return processed
-  }
-
-  const updateIndividual = async (id, rawData) => {
-    const idx = individuals.value.findIndex((i) => areIdsEqual(i.id, id))
-    if (idx !== -1) {
-      const current = individuals.value[idx]
-      const sanitized = sanitizeIndividualPayload({ ...current, ...rawData }, { forSync: false })
-      const newStatus = current.syncStatus === 'SYNCED' ? 'PENDING' : current.syncStatus
-      
-      const updated = { 
-        ...current,
-        ...sanitized,
-        id: id,
-        syncStatus: newStatus,
-        updatedAt: new Date().toISOString()
-      }
-      
-      // Need to re-process health conditions for UI
-      individuals.value[idx] = processIndividualFromApi(updated)
-      
-      saveToLocal()
-      return individuals.value[idx]
-    }
-    return null
-  }
-
-  const removeIndividual = async (id) => {
-    individuals.value = individuals.value.filter((i) => !areIdsEqual(i.id, id))
-    saveToLocal()
-    return true
-  }
-
-  const saidaCidadao = async (id, data) => {
-    individuals.value = individuals.value.filter((i) => !areIdsEqual(i.id, id))
-    saveToLocal()
-    return true
-  }
-
-  const pruneOrphanedIndividuals = async () => {
-    loading.value = true
-    try {
-      const allApi = await individualService.getAll()
-      const apiIds = new Set(allApi.map(i => i.id))
-      
-      const before = individuals.value.length
-      individuals.value = individuals.value.filter(i => {
-        if (i.syncStatus !== 'SYNCED') return true
-        return apiIds.has(i.id)
+      const filteredOld = individuals.value.filter(i => {
+        if (!areIdsEqual(i.familyId || i.family_id, familyId)) return true
+        if (i.syncStatus === 'SYNCED') return false
+        return !apiIndividuals.find(ai => ai.id === i.id)
       })
-      
-      if (individuals.value.length < before) {
-        saveToLocal()
-      }
-    } catch (err) {
-      console.error('Falha ao podar cidadãos órfãos', err)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const fetchByHousehold = async (householdId) => {
-    loading.value = true
-    error.value = null
-    try {
-      const rawIndividuals = await individualService.getByHousehold(householdId)
-      const apiIndividuals = rawIndividuals.map(processIndividualFromApi)
-      
-      const unsyncedRelated = individuals.value.filter(i => 
-        i.syncStatus !== 'SYNCED' && 
-        areIdsEqual(i.household_id || i.family?.household_id || i.householdId, householdId)
-      )
-
-      const otherHouseholds = individuals.value.filter(i => 
-        !areIdsEqual(i.household_id || i.family?.household_id || i.householdId, householdId)
-      )
-
-      const apiSet = new Set(apiIndividuals.map(i => normalizeId(i.id)))
-      const cleanUnsynced = unsyncedRelated.filter(i => !apiSet.has(normalizeId(i.id)))
 
       individuals.value = [
-        ...otherHouseholds,
-        ...apiIndividuals.map(i => ({ ...i, syncStatus: 'SYNCED' })),
-        ...cleanUnsynced
+        ...filteredOld,
+        ...apiIndividuals.map(i => ({ ...i, syncStatus: 'SYNCED' }))
       ]
-
-      saveToLocal()
+      await saveToLocal()
     } catch (err) {
-      console.warn('Falha ao buscar indivíduos por domicílio da API.', err)
-      loadFromLocal()
+      console.warn('Falha ao buscar indivíduos da API.', err)
+      await loadFromLocal()
     } finally {
       loading.value = false
     }
   }
 
-  const fetchById = async (id, options = { force: false }) => {
-    if (!options.force) {
-      const local = individuals.value.find(i => areIdsEqual(i.id, id))
-      if (local) return local
+  const fetchById = async (id) => {
+    const local = individuals.value.find(i => areIdsEqual(i.id, id))
+    if (local) {
+      currentIndividual.value = local
+      return local
+    }
+
+    const dbItem = await db.individuals.get(id)
+    if (dbItem) {
+      currentIndividual.value = dbItem
+      return dbItem
     }
 
     loading.value = true
     error.value = null
     try {
-      const response = await individualService.getById(id)
-      const processed = { ...processIndividualFromApi(response), syncStatus: 'SYNCED' }
-      return processed
+      const data = await individualService.getById(id)
+      currentIndividual.value = { ...processIndividualFromApi(data), syncStatus: 'SYNCED' }
+      return currentIndividual.value
     } catch (err) {
-      console.warn('Cidadão não encontrado na API:', id)
+      error.value = 'Erro ao carregar cidadão.'
       return null
     } finally {
       loading.value = false
     }
   }
 
-  loadFromLocal()
+  const createIndividual = async (data) => {
+    const now = new Date().toISOString()
+    const newIndividual = {
+      ...data,
+      id: generateId(),
+      syncStatus: 'PENDING',
+      createdAt: now,
+      updatedAt: now
+    }
+    individuals.value.push(newIndividual)
+    await db.individuals.add(JSON.parse(JSON.stringify(newIndividual)))
+    return newIndividual
+  }
 
-  return { 
-    individuals, 
-    currentIndividual, 
-    loading, 
-    error, 
-    fetchAll,
+  const updateIndividual = async (id, data) => {
+    const idx = individuals.value.findIndex((i) => areIdsEqual(i.id, id))
+    if (idx !== -1) {
+      const current = individuals.value[idx]
+      const newStatus = current.syncStatus === 'SYNCED' ? 'PENDING' : current.syncStatus
+      
+      const updated = { 
+        ...current, 
+        ...data, 
+        syncStatus: newStatus,
+        updatedAt: new Date().toISOString()
+      }
+      
+      individuals.value[idx] = updated
+      await db.individuals.put(JSON.parse(JSON.stringify(updated)))
+      return updated
+    }
+    return null
+  }
+
+  const removeIndividual = async (id) => {
+    loading.value = true
+    error.value = null
+    try {
+      const individual = individuals.value.find(i => areIdsEqual(i.id, id))
+      if (individual && individual.syncStatus === 'SYNCED') {
+        await individualService.remove(id)
+      }
+      
+      individuals.value = individuals.value.filter((i) => !areIdsEqual(i.id, id))
+      await db.individuals.delete(id)
+      return true
+    } catch (err) {
+      error.value = 'Erro ao excluir cidadão.'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    individuals,
+    currentIndividual,
+    loading,
+    error,
     fetchByFamily,
-    fetchByHousehold,
-    createIndividual, 
-    updateIndividual, 
-    removeIndividual,
-    saidaCidadao,
     fetchById,
-    pruneOrphanedIndividuals,
+    createIndividual,
+    updateIndividual,
+    removeIndividual,
     saveToLocal,
     loadFromLocal
   }

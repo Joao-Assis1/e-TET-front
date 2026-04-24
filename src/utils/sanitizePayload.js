@@ -115,7 +115,7 @@ export const sanitizeFamilyPayload = (payload) => {
   const allowed = [
     'id', 'numero_prontuario', 'renda_familiar', 'membros_declarados', 
     'reside_desde', 'saneamento_inadequado', 'household_id',
-    'createdAt', 'updatedAt', 'createdBy'
+    'sentinels', 'createdAt', 'updatedAt', 'createdBy'
   ]
   
   const clean = {}

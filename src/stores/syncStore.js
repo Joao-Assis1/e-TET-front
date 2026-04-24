@@ -70,9 +70,8 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       const result = await syncService.syncBatch(payload)
-      console.log('[SyncStore] Resultado do Sync:', result)
 
-      let totalSaved = 0
+      let totalSaved = 0;
       if (result.households) {
         totalSaved += result.households.length
         result.households.forEach(rh => {
@@ -133,7 +132,8 @@ export const useSyncStore = defineStore('sync', () => {
     successMessage.value = null
 
     try {
-      const remoteData = await syncService.pull()
+      const response = await syncService.pull()
+      const remoteData = response.data // O backend NestJS retorna { data: { households, families, ... } }
 
       if (remoteData.households) {
         remoteData.households.forEach(remote => {

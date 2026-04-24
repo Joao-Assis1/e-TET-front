@@ -114,9 +114,18 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useSyncStore } from '../stores/syncStore'
+import { useHouseholdStore } from '../stores/householdStore'
+import { useFamilyStore } from '../stores/familyStore'
+import { useIndividualStore } from '../stores/individualStore'
+import { useVisitStore } from '../stores/visitStore'
 
 const authStore = useAuthStore()
 const syncStore = useSyncStore()
+const householdStore = useHouseholdStore()
+const familyStore = useFamilyStore()
+const individualStore = useIndividualStore()
+const visitStore = useVisitStore()
+
 const router = useRouter()
 const route = useRoute()
 const drawer = ref(false)
@@ -144,10 +153,24 @@ watch(
 )
 
 onMounted(async () => {
-  // console.log('[AppLayout] syncStore keys:', Object.keys(syncStore))
-  // if (typeof syncStore.repairSyncStatus === 'function') {
-  //   await syncStore.repairSyncStatus()
-  // }
+  // Hidratação assíncrona dos dados do IndexedDB
+  try {
+    await Promise.all([
+      householdStore.loadFromLocal(),
+      familyStore.loadFromLocal(),
+      individualStore.loadFromLocal(),
+      visitStore.loadFromLocal()
+    ])
+    
+    // Reparo de status legado (se necessário)
+    if (typeof syncStore.repairSyncStatus === 'function') {
+      await syncStore.repairSyncStatus()
+    }
+    
+    console.log('[AppLayout] Dados locais carregados com sucesso.')
+  } catch (err) {
+    console.error('[AppLayout] Erro na hidratação inicial:', err)
+  }
 })
 
 const handleLogout = () => {

@@ -1082,31 +1082,35 @@ const hasFamilyResponsavel = (family) => {
 }
 
 const getFamilyRisk = (family) => {
-  const riskMap = {
-    'R0': { label: 'R0', color: 'blue-grey', icon: 'mdi-shield-check', score: family.pontuacao_risco },
-    'R1': { label: 'R1', color: 'blue', icon: 'mdi-alert-circle-outline', score: family.pontuacao_risco },
-    'R2': { label: 'R2', color: 'orange-darken-2', icon: 'mdi-alert', score: family.pontuacao_risco },
-    'R3': { label: 'R3', color: 'red-darken-2', icon: 'mdi-alert-octagon', score: family.pontuacao_risco }
-  }
+  const getRiskColor = (risk) => {
+    if (!risk) return 'grey-lighten-1';
+    const r = String(risk).toUpperCase();
+    if (r.includes('MÁXIMO') || r.includes('MAXIMO') || r.includes('R3')) return 'red-darken-4';
+    if (r.includes('MÉDIO') || r.includes('MEDIO') || r.includes('R2')) return 'deep-orange-darken-2';
+    if (r.includes('MENOR') || r.includes('R1')) return 'orange-darken-2';
+    if (r.includes('BAIXO') || r.includes('R0') || r.includes('SEM RISCO')) return 'green-darken-2';
+    return 'grey-lighten-1';
+  };
 
-  // Se a API já processou o risco, usamos o mapeamento
-  if (family.classificacao_risco) {
-    // Extrai o código (R0, R1, etc) caso o backend envie a string completa do enum
-    const riskCode = family.classificacao_risco.split(' ')[0]
-    if (riskMap[riskCode]) return riskMap[riskCode]
-    if (riskMap[family.classificacao_risco]) return riskMap[family.classificacao_risco]
+  const getRiskLabel = (risk) => {
+    if (!risk) return 'N/E';
+    const r = String(risk).toUpperCase();
+    if (r.includes('MÁXIMO') || r.includes('MAXIMO') || r.includes('R3')) return 'Máximo';
+    if (r.includes('MÉDIO') || r.includes('MEDIO') || r.includes('R2')) return 'Médio';
+    if (r.includes('MENOR') || r.includes('R1')) return 'Menor';
+    if (r.includes('BAIXO') || r.includes('R0')) return 'Baixo';
+    return risk;
+  };
+
+  const riskValue = family.classificacao_risco;
+
+  return {
+    label: getRiskLabel(riskValue),
+    color: getRiskColor(riskValue),
+    icon: riskValue?.includes('MÁXIMO') || riskValue?.includes('R3') ? 'mdi-alert-octagon' : 'mdi-alert-circle-outline',
+    score: family.pontuacao_risco
   }
-  
-  // Estado padrão para famílias ainda não estratificadas (Membros novos ou offline)
-  return { 
-    label: 'N/E', 
-    color: 'grey-lighten-1', 
-    icon: 'mdi-help-circle-outline', 
-    score: null,
-    description: 'Não Estratificado' 
-  }
-}
-// Utilizando formatDate importado do dateUtils
+}// Utilizando formatDate importado do dateUtils
 
 // Removed local calculateAgeText as it is now imported
 

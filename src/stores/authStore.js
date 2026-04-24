@@ -4,21 +4,19 @@ import { authService } from '../services/authService'
 import { persistence } from '../utils/persistence'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(persistence.load('token') || null)
   const user = ref(persistence.load('user') || null)
   const loading = ref(false)
   const error = ref(null)
 
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!user.value)
 
   const login = async (cpf, senha) => {
     loading.value = true
     error.value = null
     try {
       const data = await authService.login(cpf, senha)
-      token.value = data.access_token
+      // O access_token é configurado via Set-Cookie pelo backend
       user.value = { id: data.id, cpf: data.cpf }
-      persistence.save('token', token.value)
       persistence.save('user', user.value)
       return true
     } catch (err) {
@@ -31,10 +29,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = () => {
-    token.value = null
     user.value = null
     persistence.clearAll()
   }
 
-  return { token, user, loading, error, isAuthenticated, login, logout }
+  return { user, loading, error, isAuthenticated, login, logout }
 })

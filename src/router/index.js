@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/authStore'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -108,17 +109,13 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const token = persistence.load('token')
-  if (to.meta.requiresAuth !== false && !token) {
+  const authStore = useAuthStore()
+  
+  if (to.meta.requiresAuth !== false && !authStore.isAuthenticated) {
     return { name: 'login' }
   }
-  if (to.name === 'login' && token) {
+  if (to.name === 'login' && authStore.isAuthenticated) {
     return { name: 'households' }
-  }
-})
-
-export default router
-n { name: 'households' }
   }
 })
 

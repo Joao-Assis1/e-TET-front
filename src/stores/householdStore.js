@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { householdService } from '../services/householdService'
-import { persistence } from '../utils/persistence'
+import { db } from '../services/localDb'
 import { generateId } from '../utils/uuid'
 
 export const useHouseholdStore = defineStore('household', () => {
@@ -10,16 +10,33 @@ export const useHouseholdStore = defineStore('household', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  // Carrega do localStorage no início
-  const loadFromLocal = () => {
-    const saved = persistence.load('household')
-    if (saved) {
-      households.value = saved.households || []
+  /**
+   * Carrega do IndexedDB (Dexie) no início.
+   */
+  const loadFromLocal = async () => {
+    try {
+      const saved = await db.households.toArray()
+      households.value = saved || []
+      return households.value
+    } catch (err) {
+      console.error('Erro ao carregar domicílios do IndexedDB:', err)
+      return []
     }
   }
 
-  const saveToLocal = () => {
-    persistence.save('household', { households: households.value })
+  /**
+   * Sincroniza o estado em memória com o banco local.
+   */
+  const saveToLocal = async () => {
+    try {
+      // Limpa e reinsere para garantir integridade (ou usa bulkPut se IDs forem consistentes)
+      await db.households.clear()
+      if (households.value.length > 0) {
+        await db.households.bulkAdd(JSON.parse(JSON.stringify(households.value)))
+      }
+    } catch (err) {
+      console.error('Erro ao salvar domicílios no IndexedDB:', err)
+    }
   }
 
   const fetchAll = async () => {
@@ -28,7 +45,6 @@ export const useHouseholdStore = defineStore('household', () => {
     try {
       const apiHouseholds = await householdService.getAll()
       
-      // Deduplicação inteligente: Remove rascunhos que já existem no servidor (pelo endereço)
       const normalize = (s) => String(s || '').toLowerCase().trim()
       
       const unsynced = households.value.filter(h => {
@@ -46,10 +62,10 @@ export const useHouseholdStore = defineStore('household', () => {
         ...apiHouseholds.map(h => ({ ...h, syncStatus: 'SYNCED' })),
         ...unsynced
       ]
-      saveToLocal()
+      await saveToLocal()
     } catch (err) {
       console.warn('Falha ao buscar domicílios da API, usando dados locais.', err)
-      loadFromLocal()
+      await loadFromLocal()
     } finally {
       loading.value = false
     }
@@ -68,7 +84,7 @@ export const useHouseholdStore = defineStore('household', () => {
       })
       
       if (households.value.length < before) {
-        saveToLocal()
+        await saveToLocal()
       }
     } catch (err) {
       console.error('Falha ao podar domicílios órfãos', err)
@@ -78,10 +94,18 @@ export const useHouseholdStore = defineStore('household', () => {
   }
 
   const fetchById = async (id) => {
+    // Primeiro tenta no estado em memória carregado
     const local = households.value.find(h => h.id === id)
     if (local) {
       currentHousehold.value = local
       return local
+    }
+
+    // Se não estiver em memória, tenta direto no Dexie
+    const dbItem = await db.households.get(id)
+    if (dbItem) {
+      currentHousehold.value = dbItem
+      return dbItem
     }
 
     loading.value = true
@@ -108,7 +132,10 @@ export const useHouseholdStore = defineStore('household', () => {
       updatedAt: now
     }
     households.value.push(newHousehold)
-    saveToLocal()
+    
+    // Persistência imediata no Dexie
+    await db.households.add(JSON.parse(JSON.stringify(newHousehold)))
+    
     return newHousehold
   }
 
@@ -118,17 +145,22 @@ export const useHouseholdStore = defineStore('household', () => {
       const current = households.value[idx]
       const newStatus = current.syncStatus === 'SYNCED' ? 'PENDING' : current.syncStatus
       
-      households.value[idx] = { 
+      const updated = { 
         ...current, 
         ...data, 
         syncStatus: newStatus,
         updatedAt: new Date().toISOString()
       }
-      saveToLocal()
+      
+      households.value[idx] = updated
+      
+      // Persistência imediata no Dexie
+      await db.households.put(JSON.parse(JSON.stringify(updated)))
+      
       if (currentHousehold.value && currentHousehold.value.id === id) {
-        currentHousehold.value = households.value[idx]
+        currentHousehold.value = updated
       }
-      return households.value[idx]
+      return updated
     }
     return null
   }
@@ -137,9 +169,16 @@ export const useHouseholdStore = defineStore('household', () => {
     loading.value = true
     error.value = null
     try {
-      await householdService.remove(id)
+      const household = households.value.find(h => h.id === id)
+      if (household && household.syncStatus === 'SYNCED') {
+        await householdService.remove(id)
+      }
+      
       households.value = households.value.filter((h) => h.id !== id)
-      saveToLocal()
+      
+      // Remoção imediata no Dexie
+      await db.households.delete(id)
+      
       return true
     } catch (err) {
       error.value = err.response?.data?.message || 'Erro ao excluir domicílio.'
@@ -149,7 +188,8 @@ export const useHouseholdStore = defineStore('household', () => {
     }
   }
 
-  loadFromLocal()
+  // Inicialização assíncrona feita pelo componente ou AppLayout
+  // loadFromLocal() 
 
   return {
     households,

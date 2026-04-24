@@ -1,55 +1,50 @@
 /**
- * Utilitário para persistência de stores Pinia no localStorage.
+ * Utilitário para persistência de dados no IndexedDB via Dexie.
+ * Evolução do antigo persistence.js que usava localStorage.
  */
+import { db } from '../services/localDb';
 
-const STORAGE_PREFIX = 'etet_'
+const METADATA_PREFIX = 'meta_';
 
 export const persistence = {
   /**
-   * Salva o estado de um store no localStorage.
-   * @param {string} storeName 
-   * @param {Object} state 
+   * Salva dados genéricos (não entidades) no localStorage (ex: usuário, configurações).
+   * Mantemos localStorage para dados pequenos e síncronos de inicialização.
    */
-  save(storeName, state) {
+  save(key, data) {
     try {
-      const key = `${STORAGE_PREFIX}${storeName}_store`
-      // Ofuscação básica para evitar texto claro direto no devtools
-      const serialized = JSON.stringify(state)
-      const protected_data = btoa(unescape(encodeURIComponent(serialized)))
-      localStorage.setItem(key, protected_data)
+      const serialized = JSON.stringify(data);
+      localStorage.setItem(`${METADATA_PREFIX}${key}`, serialized);
     } catch (err) {
-      console.error(`Erro ao salvar store ${storeName} no localStorage:`, err)
+      console.error(`Erro ao salvar ${key} no localStorage:`, err);
     }
   },
 
   /**
-   * Carrega o estado de um store do localStorage.
-   * @param {string} storeName 
-   * @returns {Object|null}
+   * Carrega dados genéricos do localStorage.
    */
-  load(storeName) {
+  load(key) {
     try {
-      const key = `${STORAGE_PREFIX}${storeName}_store`
-      const data = localStorage.getItem(key)
-      if (!data) return null
-      
-      // Desofuscação
-      const decoded = decodeURIComponent(escape(atob(data)))
-      return JSON.parse(decoded)
+      const data = localStorage.getItem(`${METADATA_PREFIX}${key}`);
+      return data ? JSON.parse(data) : null;
     } catch (err) {
-      console.error(`Erro ao carregar store ${storeName} do localStorage:`, err)
-      return null
+      console.error(`Erro ao carregar ${key} do localStorage:`, err);
+      return null;
     }
   },
 
   /**
-   * Limpa todos os dados da aplicação no localStorage.
+   * Limpa todos os dados (LocalStorage e IndexedDB).
    */
-  clearAll() {
+  async clearAll() {
+    // Limpa localStorage da aplicação
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith(STORAGE_PREFIX)) {
-        localStorage.removeItem(key)
+      if (key.startsWith(METADATA_PREFIX) || key.startsWith('etet_')) {
+        localStorage.removeItem(key);
       }
-    })
+    });
+
+    // Limpa IndexedDB
+    await db.clearAll();
   }
-}
+};

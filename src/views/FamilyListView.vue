@@ -57,7 +57,13 @@
                 mdi-cloud-outline
               </v-icon>
 
-              <v-chip size="x-small" variant="flat" color="orange" v-if="family.risk" class="mr-2">
+              <v-chip 
+                size="x-small" 
+                variant="flat" 
+                :color="getRiskColor(family.risk)" 
+                v-if="family.risk" 
+                class="mr-2 font-weight-bold"
+              >
                 {{ family.risk }}
               </v-chip>
               <v-btn icon="mdi-chevron-right" variant="text" />
@@ -79,6 +85,16 @@ import { useFamilyStore } from '../stores/familyStore'
 
 const familyStore = useFamilyStore()
 const search = ref('')
+
+const getRiskColor = (risk) => {
+  if (!risk) return 'grey';
+  const r = risk.toUpperCase();
+  if (r.includes('MÁXIMO') || r.includes('MAXIMO')) return 'red-darken-4';
+  if (r.includes('MÉDIO') || r.includes('MEDIO')) return 'deep-orange-darken-2';
+  if (r.includes('MENOR')) return 'orange-darken-2';
+  if (r.includes('BAIXO') || r.includes('SEM RISCO')) return 'green-darken-2';
+  return 'grey';
+};
 
 const filteredFamilies = computed(() => {
   const q = search.value.toLowerCase()

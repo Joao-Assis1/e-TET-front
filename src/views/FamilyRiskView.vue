@@ -290,7 +290,8 @@ const handleSave = async () => {
 
   const result = await familyStore.recordRisk(route.params.familyId, { ...form })
   if (result) {
-    showMessage(`Risco calculado: ${result.riskClass} (${result.finalScore} pontos)`)
+    const displayRisk = result.riskClass || 'Calculado'
+    showMessage(`Estratificação concluída: ${displayRisk} (${result.finalScore} pontos)`)
     setTimeout(() => {
       handleBack()
     }, 2000)
