@@ -9,8 +9,18 @@ const api = axios.create({
   timeout: 60000,
 })
 
-// Não precisamos mais do interceptor de request para adicionar o Bearer token
-// O navegador enviará o Cookie access_token automaticamente
+// Interceptor de requisiçǜo para adicionar o Bearer token
+// Garante o funcionamento em mobile/cross-site (contorna bloqueio de cookies de terceiros)
+api.interceptors.request.use((config) => {
+  const authStore = useAuthStore()
+  const token = authStore.user?.token
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+})
 
 api.interceptors.response.use(
   (response) => response,

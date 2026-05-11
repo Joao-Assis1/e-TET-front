@@ -15,8 +15,8 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const data = await authService.login(cpf, senha)
-      // O access_token é configurado via Set-Cookie pelo backend
-      user.value = { id: data.id, cpf: data.cpf }
+      // Capturamos o token explicitamente para o fallback mobile (Header Authorization)
+      user.value = { id: data.id, cpf: data.cpf, token: data.access_token }
       persistence.save('user', user.value)
       return true
     } catch (err) {
