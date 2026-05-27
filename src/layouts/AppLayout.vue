@@ -53,6 +53,20 @@
             </v-chip>
           </template>
         </v-list-item>
+
+        <v-list-item
+          prepend-icon="mdi-sync-alert"
+          title="Inconsistências"
+          to="/sync-inconsistencies"
+          rounded="lg"
+          color="error"
+        >
+          <template v-slot:append>
+            <v-chip v-if="syncStore.inconsistenciesCount > 0" color="error" size="x-small" variant="flat">
+              {{ syncStore.inconsistenciesCount }}
+            </v-chip>
+          </template>
+        </v-list-item>
       </v-list>
 
       <template v-slot:append>

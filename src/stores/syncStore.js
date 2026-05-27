@@ -21,6 +21,18 @@ export const useSyncStore = defineStore('sync', () => {
   const error = ref(null)
   const successMessage = ref(null)
 
+  const inconsistencies = ref(
+    JSON.parse(localStorage.getItem('eTet_syncInconsistencies')) || 
+    { households: [], families: [], individuals: [], visits: [] }
+  )
+
+  const inconsistenciesCount = computed(() => {
+    return (inconsistencies.value?.households?.length || 0) +
+           (inconsistencies.value?.families?.length || 0) +
+           (inconsistencies.value?.individuals?.length || 0) +
+           (inconsistencies.value?.visits?.length || 0)
+  })
+
   const pendingCount = computed(() => {
     const isPending = (item) => item.syncStatus === 'PENDING' || (item.syncStatus === undefined && item.synced === false)
     
@@ -94,19 +106,83 @@ export const useSyncStore = defineStore('sync', () => {
         totalSaved += result.individuals.length
         result.individuals.forEach(ri => {
           const idx = individualStore.individuals.findIndex(i => i.id === ri.id)
-          if (idx !== -1) individualStore.individuals[idx] = { ...ri, syncStatus: 'SYNCED' }
+          if (idx !== -1) {
+            const processed = processIndividualFromApi(ri)
+            individualStore.individuals[idx] = { ...processed, syncStatus: 'SYNCED' }
+          }
         })
         individualStore.saveToLocal()
       }
 
       const totalInconsistencies = (result.inconsistencias?.households?.length || 0) + 
                                   (result.inconsistencias?.families?.length || 0) + 
-                                  (result.inconsistencias?.individuals?.length || 0)
+                                  (result.inconsistencias?.individuals?.length || 0) +
+                                  (result.inconsistencias?.visits?.length || 0)
+
+      inconsistencies.value = result.inconsistencias || { households: [], families: [], individuals: [], visits: [] }
+      localStorage.setItem('eTet_syncInconsistencies', JSON.stringify(inconsistencies.value))
+
+      // Auto-reparo de integridade referencial:
+      // Se um domicílio ou família está faltando no servidor (ex: deletado remotamente ou base resetada), 
+      // mas marcado localmente como SYNCED, marcamos o local como PENDING para ser reenviado no próximo lote.
+      let repairedAny = false
+
+      if (result.inconsistencias?.families) {
+        result.inconsistencias.families.forEach(err => {
+          const match = String(err.erro || '').match(/Domicílio associado não encontrado:\s*([a-f0-9-]{36})/i)
+          if (match && match[1]) {
+            const missingHouseholdId = match[1]
+            const idx = householdStore.households.findIndex(h => h.id === missingHouseholdId)
+            if (idx !== -1 && householdStore.households[idx].syncStatus !== 'PENDING') {
+              householdStore.households[idx].syncStatus = 'PENDING'
+              repairedAny = true
+              console.log(`[SyncStore] Auto-reparo: Marcando Domicílio ${missingHouseholdId} como PENDING para re-sincronização.`)
+            }
+          }
+        })
+      }
+
+      if (result.inconsistencias?.individuals) {
+        result.inconsistencias.individuals.forEach(err => {
+          // Checa se é falta de família
+          const familyMatch = String(err.erro || '').match(/Família associada não encontrada:\s*([a-f0-9-]{36})/i)
+          if (familyMatch && familyMatch[1]) {
+            const missingFamilyId = familyMatch[1]
+            const idx = familyStore.families.findIndex(f => f.id === missingFamilyId)
+            if (idx !== -1 && familyStore.families[idx].syncStatus !== 'PENDING') {
+              familyStore.families[idx].syncStatus = 'PENDING'
+              repairedAny = true
+              console.log(`[SyncStore] Auto-reparo: Marcando Família ${missingFamilyId} como PENDING para re-sincronização.`)
+            }
+          }
+
+          // Checa se é falta de domicílio
+          const householdMatch = String(err.erro || '').match(/Domicílio associado ao cidadão não encontrado:\s*([a-f0-9-]{36})/i)
+          if (householdMatch && householdMatch[1]) {
+            const missingHouseholdId = householdMatch[1]
+            const idx = householdStore.households.findIndex(h => h.id === missingHouseholdId)
+            if (idx !== -1 && householdStore.households[idx].syncStatus !== 'PENDING') {
+              householdStore.households[idx].syncStatus = 'PENDING'
+              repairedAny = true
+              console.log(`[SyncStore] Auto-reparo: Marcando Domicílio ${missingHouseholdId} como PENDING para re-sincronização.`)
+            }
+          }
+        })
+      }
+
+      if (repairedAny) {
+        householdStore.saveToLocal()
+        familyStore.saveToLocal()
+      }
 
       lastSyncTime.value = new Date().toISOString()
       
       if (totalInconsistencies > 0) {
-        successMessage.value = `Sincronização parcial: ${totalSaved} registros salvos, ${totalInconsistencies} erros reportados.`
+        let msg = `Sincronização parcial: ${totalSaved} registros salvos, ${totalInconsistencies} erros reportados.`
+        if (repairedAny) {
+          msg += ` Registros dependentes foram marcados para re-sincronização automática na próxima tentativa.`
+        }
+        successMessage.value = msg
       } else {
         successMessage.value = `Sincronização concluída: ${totalSaved} novos registros no servidor.`
       }
@@ -253,6 +329,8 @@ export const useSyncStore = defineStore('sync', () => {
     pendingCount,
     statusIcon,
     statusColor,
+    inconsistencies,
+    inconsistenciesCount,
     performSync,
     pullFromRemote,
     performFullSync,
