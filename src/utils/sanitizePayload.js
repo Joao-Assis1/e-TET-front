@@ -249,7 +249,10 @@ export const sanitizeIndividualPayload = (payload, options = {}) => {
   }
 
   // 2. Agrupar TODAS as condições de saúde em healthConditions (DTO IndividualHealthDto)
-  const hc = payload.healthConditions || {}
+  let hc = payload._healthObject || payload.healthConditions || {}
+  if (Array.isArray(hc)) {
+    hc = {}
+  }
   
   clean.healthConditions = {
     gestante: !!(payload.gestante ?? hc.gestante),

@@ -5,6 +5,7 @@ import { db } from '../services/localDb'
 import { processIndividualFromApi } from '../utils/healthConditionMapper'
 import { generateId } from '../utils/uuid'
 import { areIdsEqual } from '../utils/idNormalization'
+import { sanitizeIndividualPayload } from '../utils/sanitizePayload'
 
 export const useIndividualStore = defineStore('individual', () => {
   const individuals = ref([])
@@ -94,9 +95,10 @@ export const useIndividualStore = defineStore('individual', () => {
   }
 
   const createIndividual = async (data) => {
+    const sanitized = sanitizeIndividualPayload(data)
     const now = new Date().toISOString()
     const newIndividual = {
-      ...data,
+      ...sanitized,
       id: generateId(),
       syncStatus: 'PENDING',
       createdAt: now,
@@ -112,10 +114,11 @@ export const useIndividualStore = defineStore('individual', () => {
     if (idx !== -1) {
       const current = individuals.value[idx]
       const newStatus = current.syncStatus === 'SYNCED' ? 'PENDING' : current.syncStatus
+      const sanitized = sanitizeIndividualPayload(data)
       
       const updated = { 
         ...current, 
-        ...data, 
+        ...sanitized, 
         syncStatus: newStatus,
         updatedAt: new Date().toISOString()
       }

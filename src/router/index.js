@@ -103,6 +103,12 @@ const router = createRouter({
           component: () => import('../views/VisitHistoryView.vue'),
           meta: { title: 'Histórico de Visitas' },
         },
+        {
+          path: 'sync-inconsistencies',
+          name: 'sync-inconsistencies',
+          component: () => import('../views/SyncInconsistenciesView.vue'),
+          meta: { title: 'Inconsistências de Sincronização' },
+        },
       ],
     },
   ],
