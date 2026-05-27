@@ -217,6 +217,20 @@ export const useFamilyStore = defineStore('family', () => {
       
       const family = families.value[idx]
 
+      // Calcular risco localmente para exibição imediata (Offline-First)
+      const weight3 = ((sanitized.bedriddenCount || 0) + (sanitized.physicalDisabilityCount || 0) + (sanitized.mentalDisabilityCount || 0) + (sanitized.severeMalnutritionCount || 0)) * 3;
+      const weight2 = ((sanitized.drugAddictionCount || 0) + (sanitized.unemployedCount || 0) + (sanitized.illiterateCount || 0) + (sanitized.under6MonthsCount || 0) + (sanitized.over70YearsCount || 0)) * 2;
+      const weight1 = ((sanitized.hypertensionCount || 0) + (sanitized.diabetesCount || 0)) * 1 + (!sanitized.basicSanitation ? 3 : 0);
+      const individualsCount = family.membros_declarados || 1;
+      const roomsCount = sanitized.roomsCount || 1;
+      const ratio = individualsCount / roomsCount;
+      let ratioPoints = ratio < 1 ? 0 : (ratio === 1 ? 1 : 2);
+      const finalScoreLocal = weight3 + weight2 + weight1 + ratioPoints;
+      let riskClassLocal = 'Risco Baixo';
+      if (finalScoreLocal >= 9) riskClassLocal = 'Risco Máximo';
+      else if (finalScoreLocal >= 7) riskClassLocal = 'Risco Médio';
+      else if (finalScoreLocal >= 5) riskClassLocal = 'Risco Menor';
+
       if (family.syncStatus === 'SYNCED') {
         try {
           const result = await familyService.registerRisk(familyId, sanitized)
@@ -238,6 +252,8 @@ export const useFamilyStore = defineStore('family', () => {
       const updatedLocal = { 
         ...families.value[idx], 
         sentinels: sanitized,
+        pontuacao_risco: finalScoreLocal,
+        classificacao_risco: riskClassLocal,
         syncStatus: 'PENDING',
         updatedAt: new Date().toISOString()
       }
@@ -246,8 +262,8 @@ export const useFamilyStore = defineStore('family', () => {
       await db.families.put(JSON.parse(JSON.stringify(updatedLocal)))
 
       return {
-        finalScore: 0, 
-        riskClass: 'Pendente de Sincronização' 
+        finalScore: finalScoreLocal, 
+        riskClass: riskClassLocal 
       }
     } catch (err) {
       error.value = err.response?.data?.message || err.message || 'Erro ao salvar estratificação de risco.'
