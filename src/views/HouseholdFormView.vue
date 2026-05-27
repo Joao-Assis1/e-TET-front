@@ -254,7 +254,7 @@
         elevation="2"
         data-testid="household-next"
       >
-        {{ currentStep === 3 ? 'SALVAR IMÓVEL' : 'PRÓXIMA ETAPA' }}
+        {{ currentStep === 3 ? 'SALVAR' : 'AVANÇAR' }}
       </v-btn>
     </v-footer>
 
@@ -398,5 +398,12 @@ onMounted(async () => {
 /* Ajustes visuais Vuetify */
 :deep(.v-field--variant-outlined) {
   background-color: white;
+}
+:deep(.v-footer) {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
 }
 </style>

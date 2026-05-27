@@ -1205,6 +1205,8 @@ const handleSaveRisk = async (riskData) => {
   if (result) {
     riskDialog.value = false
     showMessage(`Estratificação de risco salva com sucesso!`)
+    // Refetch families to ensure computed properties update and show the new risk badge
+    await familyStore.fetchByHousehold(route.params.id)
   } else {
     showMessage(familyStore.error || 'Erro ao salvar estratificação.', 'error')
   }

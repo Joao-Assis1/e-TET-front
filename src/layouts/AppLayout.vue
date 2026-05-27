@@ -70,7 +70,7 @@
     </v-main>
 
     <!-- Navegação Inferior para Mobile -->
-    <v-bottom-navigation v-if="!route.meta.showBack" grow color="primary" class="d-md-none" elevation="10">
+    <v-bottom-navigation v-if="showBottomNav" app grow color="primary" class="d-md-none" elevation="10">
       <v-btn to="/households" value="households">
         <v-icon>mdi-home</v-icon>
         <span>Domicílios</span>
@@ -129,6 +129,19 @@ const visitStore = useVisitStore()
 const router = useRouter()
 const route = useRoute()
 const drawer = ref(false)
+
+const showBottomNav = computed(() => {
+  const formRoutes = [
+    'household-create',
+    'household-edit',
+    'citizen-create',
+    'citizen-edit',
+    'family-risk',
+    'family-visit',
+    'citizen-visit'
+  ]
+  return !formRoutes.includes(route.name)
+})
 
 const formatCpf = (v) => {
   if (!v) return ''

@@ -167,55 +167,64 @@
               <v-radio label="Sim" :value="true" color="primary"></v-radio>
               <v-radio label="Não" :value="false" color="primary"></v-radio>
             </v-radio-group>
-            <v-select
-              label="Grau de instrução"
-              v-model="formData.grau_instrucao"
-              :items="[
-                'Creche',
-                'Pré-escola',
-                'Ensino Fundamental 1ª a 4ª séries',
-                'Ensino Fundamental 5ª a 8ª séries',
-                'Ensino Fundamental Completo',
-                'Ensino Médio Incompleto',
-                'Ensino Médio Completo',
-                'Ensino Superior Incompleto',
-                'Ensino Superior Completo',
-                'EJA - Fundamental',
-                'EJA - Médio',
-                'Alfabetização para Adultos',
-                'Nenhum',
-              ]"
-              class="mb-4"
-            />
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-select
+                  label="Grau de instrução"
+                  v-model="formData.grau_instrucao"
+                  :items="[
+                    'Creche',
+                    'Pré-escola',
+                    'Ensino Fundamental 1ª a 4ª séries',
+                    'Ensino Fundamental 5ª a 8ª séries',
+                    'Ensino Fundamental Completo',
+                    'Ensino Médio Incompleto',
+                    'Ensino Médio Completo',
+                    'Ensino Superior Incompleto',
+                    'Ensino Superior Completo',
+                    'EJA - Fundamental',
+                    'EJA - Médio',
+                    'Alfabetização para Adultos',
+                    'Nenhum',
+                  ]"
+                  class="mb-4"
+                />
+              </v-col>
 
-             <v-select
-              label="Situação no mercado de trabalho"
-              v-model="formData.situacao_trabalho"
-              :items="[
-                'Asalariado com carteira assinada',
-                'Asalariado sem carteira assinada',
-                'Autônomo com contribuição previdenciária',
-                'Autônomo sem contribuição previdenciária',
-                'Aposentado/Pensionista',
-                'Desempregado',
-                'Trabalho Informal',
-                'Outro',
-              ]"
-              class="mb-4"
-            />
-            <v-select
-              label="Parentesco com o responsável"
-              v-model="formData.parentesco_responsavel"
-              :items="[
-                'Cônjuge / Companheiro(a)',
-                'Filho(a)',
-                'Enteado(a)',
-                'Pai / Mãe',
-                'Agregado(a)',
-                'Irmão / Irmã',
-                'Outro',
-              ]"
-            />
+              <v-col cols="12" sm="6">
+                <v-select
+                  label="Situação no mercado de trabalho"
+                  v-model="formData.situacao_trabalho"
+                  :items="[
+                    'Asalariado com carteira assinada',
+                    'Asalariado sem carteira assinada',
+                    'Autônomo com contribuição previdenciária',
+                    'Autônomo sem contribuição previdenciária',
+                    'Aposentado/Pensionista',
+                    'Desempregado',
+                    'Trabalho Informal',
+                    'Outro',
+                  ]"
+                  class="mb-4"
+                />
+              </v-col>
+
+              <v-col cols="12" sm="6">
+                <v-select
+                  label="Parentesco com o responsável"
+                  v-model="formData.parentesco_responsavel"
+                  :items="[
+                    'Cônjuge / Companheiro(a)',
+                    'Filho(a)',
+                    'Enteado(a)',
+                    'Pai / Mãe',
+                    'Agregado(a)',
+                    'Irmão / Irmã',
+                    'Outro',
+                  ]"
+                />
+              </v-col>
+            </v-row>
           </v-window-item>
 
           <!-- ETAPA 4: Sociodemográfico Grid -->
@@ -225,10 +234,10 @@
               <v-chip size="small" variant="flat">Etapa 4 de 6</v-chip>
             </div>
             <v-row dense>
-              <v-col cols="12" md="6" v-for="(q, idx) in sociodemographicQuestions" :key="idx">
+              <v-col cols="12" sm="6" v-for="(q, idx) in sociodemographicQuestions" :key="idx">
                 <v-card variant="flat" border rounded="lg" class="mb-3 overflow-hidden">
                   <v-card-title
-                    class="text-subtitle-2 font-weight-bold pa-4 d-flex align-center text-white"
+                    class="text-subtitle-2 font-weight-bold pa-4 d-flex align-center text-white text-wrap"
                     :class="
                       formData[q.key] === true
                         ? 'bg-primary'
@@ -295,13 +304,14 @@
             <v-row dense>
               <v-col
                 cols="12"
+                sm="6"
                 v-for="(q, idx) in healthConditions5"
                 :key="idx"
                 v-show="q.key !== 'gestante' || formData.sexo === 'Feminino'"
               >
                 <v-card variant="flat" border rounded="lg" class="mb-4 overflow-hidden">
                   <v-card-title
-                    class="text-subtitle-2 font-weight-bold pa-4 d-flex align-center text-white"
+                    class="text-subtitle-2 font-weight-bold pa-4 d-flex align-center text-white text-wrap"
                     :class="
                       formData[q.key] === true
                         ? q.alert
@@ -378,7 +388,7 @@
             </div>
 
             <v-row dense>
-              <v-col cols="12" md="6" v-for="(q, idx) in healthConditions6" :key="idx">
+              <v-col cols="12" sm="6" v-for="(q, idx) in healthConditions6" :key="idx">
                 <v-card variant="flat" border rounded="lg" class="mb-3 overflow-hidden">
                   <v-card-title
                     class="text-subtitle-2 font-weight-bold pa-4 d-flex align-center text-white text-wrap"
@@ -432,7 +442,7 @@
         size="large"
         class="flex-grow-1"
         @click="currentStep--"
-        >ETAPA ANTERIOR</v-btn
+        >ANTERIOR</v-btn
       >
       <v-btn v-else variant="text" size="large" class="flex-grow-1" @click="confirmExit = true"
         >CANCELAR</v-btn
@@ -446,7 +456,7 @@
         @click="handleNext"
         data-testid="citizen-next"
       >
-        {{ currentStep === 6 ? 'FINALIZAR CADASTRO' : 'PRÓXIMA ETAPA' }}
+        {{ currentStep === 6 ? 'FINALIZAR' : 'AVANÇAR' }}
       </v-btn>
     </v-footer>
 
@@ -799,5 +809,12 @@ const handleRefusal = async () => {
 }
 :deep(.v-field__input) {
   background-color: white;
+}
+:deep(.v-footer) {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
 }
 </style>
