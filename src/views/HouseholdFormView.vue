@@ -291,8 +291,10 @@ const isEdit = computed(() => !!route.params.id)
 const handleExit = () => {
   confirmExit.value = false
   
-  if (window.history.length > 1 && window.history.state?.back) {
+  if (window.history.state?.back) {
     router.back()
+  } else if (route.params.id) {
+    router.push({ name: 'household-detail', params: { id: route.params.id } })
   } else {
     router.push({ name: 'households' })
   }

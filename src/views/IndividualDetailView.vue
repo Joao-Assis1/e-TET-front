@@ -251,6 +251,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useIndividualStore } from '../stores/individualStore'
 import { useFamilyStore } from '../stores/familyStore'
 import { useVisitCartStore } from '../stores/visitCartStore'
+import { useUiStore } from '../stores/uiStore'
 import { processIndividualFromApi } from '../utils/healthConditionMapper'
 import { format, differenceInYears, differenceInMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -260,6 +261,7 @@ const route = useRoute()
 const individualStore = useIndividualStore()
 const familyStore = useFamilyStore()
 const visitCartStore = useVisitCartStore()
+const uiStore = useUiStore()
 
 const loading = ref(true)
 const citizen = ref(null)
@@ -324,6 +326,7 @@ const loadCitizen = async (force = false) => {
     }
   } catch (err) {
     console.error('Erro ao buscar cidadão:', err)
+    uiStore.showError('Não foi possível carregar as informações do cidadão.')
   } finally {
     loading.value = false
   }
@@ -422,10 +425,16 @@ const editProfile = (step = 1) => router.push({
 })
 
 const handleBack = () => {
-  const householdId = citizen.value?.family?.household_id
-  if (householdId && window.history.state?.back?.includes('households')) {
-    router.push({ name: 'household-detail', params: { id: householdId } })
-  } else { router.back() }
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    const householdId = citizen.value?.family?.household_id
+    if (householdId) {
+      router.push({ name: 'household-detail', params: { id: householdId } })
+    } else {
+      router.push({ name: 'households' })
+    }
+  }
 }
 </script>
 

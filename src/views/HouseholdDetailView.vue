@@ -1059,7 +1059,7 @@ const housingDetails = computed(() => {
 })
 
 const handleBack = () => {
-  if (window.history.length > 1 && window.history.state?.back) {
+  if (window.history.state?.back) {
     router.back()
   } else {
     router.push({ name: 'households' })
@@ -1319,6 +1319,7 @@ const handleSaveFamily = async () => {
     }
   } catch (err) {
     console.error('[handleSaveFamily] Exceção:', err)
+    showMessage(err.response?.data?.message || err.message || 'Erro inesperado ao salvar família.', 'error')
   }
 }
 

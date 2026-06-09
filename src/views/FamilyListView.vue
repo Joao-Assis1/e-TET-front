@@ -17,7 +17,7 @@
 
     <v-card border elevation="0" rounded="xl">
       <v-list lines="two">
-        <template v-for="(family, index) in filteredFamilies" :key="family.id">
+        <template v-for="(family, index) in paginatedFamilies" :key="family.id">
           <v-list-item
             :title="family.name || 'Família sem nome'"
             :subtitle="`Responsável: ${family.responsible || 'Não definido'}`"
@@ -69,8 +69,12 @@
               <v-btn icon="mdi-chevron-right" variant="text" />
             </template>
           </v-list-item>
-          <v-divider v-if="index < filteredFamilies.length - 1" inset />
+          <v-divider v-if="index < paginatedFamilies.length - 1" inset />
         </template>
+        
+        <div v-if="hasMore" v-intersect="loadMore" class="pa-4 text-center">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+        </div>
         <div v-if="filteredFamilies.length === 0" class="text-center pa-8 text-grey">
           Nenhuma família carregada localmente.
         </div>
@@ -108,6 +112,22 @@ const filteredFamilies = computed(() => {
     risk: f.classificacao_risco || null
   }))
 })
+
+const displayLimit = ref(20)
+
+const paginatedFamilies = computed(() => {
+  return filteredFamilies.value.slice(0, displayLimit.value)
+})
+
+const hasMore = computed(() => {
+  return displayLimit.value < filteredFamilies.value.length
+})
+
+const loadMore = (isIntersecting) => {
+  if (isIntersecting && hasMore.value) {
+    displayLimit.value += 20
+  }
+}
 
 onMounted(() => {
   if (familyStore.families.length === 0) {

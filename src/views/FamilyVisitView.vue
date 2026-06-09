@@ -268,7 +268,13 @@ onMounted(() => {
 })
 
 const handleCancel = () => {
-  router.back()
+  if (window.history.state?.back) {
+    router.back()
+  } else if (family.value?.household_id) {
+    router.push({ name: 'household-detail', params: { id: family.value.household_id } })
+  } else {
+    router.push({ name: 'households' })
+  }
 }
 
 const handleFinalize = async () => {
@@ -295,7 +301,7 @@ const handleFinalize = async () => {
         query: { stratifyFamily: familyId }
       })
     } else {
-      router.back()
+      handleCancel()
     }
   } catch (err) {
     console.error('Erro ao finalizar visita:', err)
