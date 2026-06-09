@@ -277,8 +277,10 @@ const numericFields = [
 ]
 
 const handleBack = () => {
-  if (window.history.length > 1 && window.history.state?.back) {
+  if (window.history.state?.back) {
     router.back()
+  } else if (route.query.householdId) {
+    router.push({ name: 'household-detail', params: { id: route.query.householdId } })
   } else {
     router.push({ name: 'households' })
   }

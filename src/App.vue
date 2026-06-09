@@ -5,6 +5,7 @@
         <component :is="Component" :key="route.path" />
       </transition>
     </router-view>
+    <GlobalSnackbar />
   </v-app>
 </template>
 
@@ -12,6 +13,7 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from './stores/authStore'
 import { useSyncStore } from './stores/syncStore'
+import GlobalSnackbar from './components/GlobalSnackbar.vue'
 
 const authStore = useAuthStore()
 const syncStore = useSyncStore()

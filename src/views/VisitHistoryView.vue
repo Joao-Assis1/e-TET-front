@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <div class="d-flex align-center mb-6">
-      <v-btn icon="mdi-arrow-left" variant="text" @click="$router.back()" class="mr-2" />
+      <v-btn icon="mdi-arrow-left" variant="text" @click="handleBack" class="mr-2" />
       <h1 class="text-h4 font-weight-bold">Histórico de Visitas</h1>
       <v-spacer />
       <v-btn
@@ -61,6 +61,17 @@ import { formatDate } from '../utils/dateUtils'
 
 const visitStore = useVisitStore()
 const syncStore = useSyncStore()
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const handleBack = () => {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push({ name: 'households' })
+  }
+}
 
 const visits = computed(() => {
   return visitStore.history || []

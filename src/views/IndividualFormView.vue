@@ -562,8 +562,12 @@ const handleExit = () => {
   confirmExit.value = false
   confirmRefusal.value = false
 
-  if (window.history.length > 1 && window.history.state?.back) {
+  if (window.history.state?.back) {
     router.back()
+  } else if (route.params.id) {
+    router.push({ name: 'citizen-detail', params: { id: route.params.id } })
+  } else if (route.params.householdId) {
+    router.push({ name: 'household-detail', params: { id: route.params.householdId } })
   } else {
     router.push({ name: 'households' })
   }

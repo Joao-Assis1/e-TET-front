@@ -122,15 +122,17 @@
                   </h3>
                 </div>
 
-                <!-- Detalhes do Erro -->
                 <v-alert
-                  type="error"
+                  :type="(err.erro || '').includes('Conflito de concorrência') ? 'warning' : 'error'"
                   variant="tonal"
                   density="comfortable"
                   class="rounded-lg text-caption font-weight-medium pa-3 mb-0"
-                  icon="mdi-alert-octagon"
+                  :icon="(err.erro || '').includes('Conflito de concorrência') ? 'mdi-account-sync-outline' : 'mdi-alert-octagon'"
                 >
-                  {{ err.erro || 'Falha de validação desconhecida.' }}
+                  <div class="d-flex align-center">
+                    <span v-if="(err.erro || '').includes('Conflito de concorrência')" class="font-weight-bold mr-2">Conflito de Versão:</span>
+                    <span>{{ err.erro || 'Falha de validação desconhecida.' }}</span>
+                  </div>
                 </v-alert>
                 <div class="text-caption text-grey mt-2">
                   ID: <span class="font-mono">{{ err.id }}</span>
