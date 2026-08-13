@@ -1,3 +1,5 @@
+> ⚠️ **Novo Desenvolvedor?** [Leia o Guia de Handover (Transferência) aqui antes de começar!](docs/HANDOVER.md)
+
 # 📱 e-ACS: Coleta de Dados em Campo
 
 Aplicativo mobile/front-end construído para os Agentes Comunitários de Saúde (ACS). Utilizado em tablets e smartphones, permite o cadastramento e acompanhamento contínuo de **Domicílios, Famílias e Cidadãos**, coletando determinantes sociais e de saúde (hipertensão, diabetes, gestação, etc.) diretamente no território.
