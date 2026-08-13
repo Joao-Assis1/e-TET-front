@@ -42,3 +42,11 @@ npm run build
 ```sh
 npm run lint
 ```
+
+## Documentação Complementar
+
+- [Roadmap](docs/ROADMAP.md)
+- [Relatório de Testes de Sincronização (Neon)](docs/TEST_REPORT_SYNC_NEON.md)
+- [Descobertas e Notas (Findings)](docs/findings.md)
+- [Especificação de Sync v2](docs/sync-territory-v2.md)
+- [Planejamento de Tarefas](docs/task_plan.md)
